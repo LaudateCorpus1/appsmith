@@ -308,6 +308,7 @@ export function* deleteDatasourceSaga(
 function* updateDatasourceSaga(
   actionPayload: ReduxActionWithCallbacks<Datasource, unknown, unknown>,
 ) {
+  console.log("actionPayload", actionPayload);
   try {
     const queryParams = getQueryParams();
     const datasourcePayload = _.omit(actionPayload.payload, "name");
@@ -611,12 +612,16 @@ function* createDatasourceFromFormSaga(
 
     const payload = merge(initialValues, actionPayload.payload);
 
+    console.log("payload", payload);
+
     const response: GenericApiResponse<Datasource> = yield DatasourcesApi.createDatasource(
       {
         ...payload,
         organizationId,
       },
     );
+    // updateDatasourceSaga(actionPayload.payload);
+    console.log("response", response);
     const isValidResponse = yield validateResponse(response);
     if (isValidResponse) {
       yield put({
