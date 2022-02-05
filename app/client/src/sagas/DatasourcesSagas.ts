@@ -308,7 +308,6 @@ export function* deleteDatasourceSaga(
 function* updateDatasourceSaga(
   actionPayload: ReduxActionWithCallbacks<Datasource, unknown, unknown>,
 ) {
-  console.log("actionPayload", actionPayload);
   try {
     const queryParams = getQueryParams();
     const datasourcePayload = _.omit(actionPayload.payload, "name");
@@ -594,8 +593,40 @@ function* testDatasourceSaga(actionPayload: ReduxAction<Datasource>) {
   }
 }
 
-function* createDatasourceFromFormSaga(
+function* createTempDatasourceFromFormSaga(
   actionPayload: ReduxAction<CreateDatasourceConfig>,
+) {
+  const payload = {
+    id: "TEMP-ID-1",
+    name: "New Datasource",
+    type: (actionPayload.payload as any).type,
+    pluginId: actionPayload.payload.pluginId,
+    new: false,
+    datasourceConfiguration: {
+      properties: [],
+    },
+  };
+
+  yield put({
+    type: ReduxActionTypes.UPDATE_DATASOURCE_REFS,
+    payload,
+  });
+
+  yield put({
+    type: ReduxActionTypes.CREATE_DATASOURCE_SUCCESS,
+    payload,
+  });
+
+  yield put(
+    setDatsourceEditorMode({
+      id: payload.id,
+      viewMode: false,
+    }),
+  );
+}
+
+function* createDatasourceFromFormSaga(
+  actionPayload: ReduxActionWithCallbacks<Datasource, unknown, unknown>,
 ) {
   try {
     const organizationId = yield select(getCurrentOrgId);
@@ -610,9 +641,12 @@ function* createDatasourceFromFormSaga(
 
     const initialValues = yield call(getConfigInitialValues, formConfig);
 
-    const payload = merge(initialValues, actionPayload.payload);
-
-    console.log("payload", payload);
+    const payload = _.omit(merge(initialValues, actionPayload.payload), [
+      "id",
+      "name",
+      "new",
+      "type",
+    ]);
 
     const response: GenericApiResponse<Datasource> = yield DatasourcesApi.createDatasource(
       {
@@ -620,8 +654,7 @@ function* createDatasourceFromFormSaga(
         organizationId,
       },
     );
-    // updateDatasourceSaga(actionPayload.payload);
-    console.log("response", response);
+
     const isValidResponse = yield validateResponse(response);
     if (isValidResponse) {
       yield put({
@@ -632,18 +665,29 @@ function* createDatasourceFromFormSaga(
         type: ReduxActionTypes.CREATE_DATASOURCE_SUCCESS,
         payload: response.data,
       });
+
+      yield put({
+        type: ReduxActionTypes.UPDATE_DATASOURCE_SUCCESS,
+        payload: response.data,
+      });
+
       // Todo: Refactor later.
       // If we move this `put` over to QueryPaneSaga->handleDatasourceCreatedSaga, onboarding tests start failing.
       yield put(
         setDatsourceEditorMode({
           id: response.data.id,
-          viewMode: false,
+          viewMode: true,
         }),
       );
+
       Toaster.show({
         text: createMessage(DATASOURCE_CREATE, response.data.name),
         variant: Variant.success,
       });
+
+      if (actionPayload.onSuccess) {
+        yield put(actionPayload.onSuccess);
+      }
     }
   } catch (error) {
     yield put({
@@ -995,6 +1039,10 @@ export function* watchDatasourcesSagas() {
     takeEvery(
       ReduxActionTypes.CREATE_DATASOURCE_FROM_FORM_INIT,
       createDatasourceFromFormSaga,
+    ),
+    takeEvery(
+      ReduxActionTypes.CREATE_TEMP_DATASOURCE_FROM_FORM_SUCCESS,
+      createTempDatasourceFromFormSaga,
     ),
     takeEvery(ReduxActionTypes.UPDATE_DATASOURCE_INIT, updateDatasourceSaga),
     takeEvery(ReduxActionTypes.SAVE_DATASOURCE_NAME, saveDatasourceNameSaga),
