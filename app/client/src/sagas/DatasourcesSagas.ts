@@ -455,7 +455,7 @@ function* getOAuthAccessTokenSaga(
   }
 }
 
-function* saveDatasourceNameSaga(
+function* updateDatasourceNameSaga(
   actionPayload: ReduxAction<{ id: string; name: string }>,
 ) {
   try {
@@ -469,13 +469,13 @@ function* saveDatasourceNameSaga(
     const isValidResponse = yield validateResponse(response);
     if (isValidResponse) {
       yield put({
-        type: ReduxActionTypes.SAVE_DATASOURCE_NAME_SUCCESS,
+        type: ReduxActionTypes.UPDATE_DATASOURCE_NAME_SUCCESS,
         payload: { ...response.data },
       });
     }
   } catch (error) {
     yield put({
-      type: ReduxActionErrorTypes.SAVE_DATASOURCE_NAME_ERROR,
+      type: ReduxActionErrorTypes.UPDATE_DATASOURCE_NAME_ERROR,
       payload: { id: actionPayload.payload.id },
     });
   }
@@ -607,10 +607,10 @@ function* createTempDatasourceFromFormSaga(
     },
   };
 
-  yield put({
-    type: ReduxActionTypes.UPDATE_DATASOURCE_REFS,
-    payload,
-  });
+  // yield put({
+  //   type: ReduxActionTypes.UPDATE_DATASOURCE_REFS,
+  //   payload,
+  // });
 
   yield put({
     type: ReduxActionTypes.CREATE_DATASOURCE_SUCCESS,
@@ -657,10 +657,10 @@ function* createDatasourceFromFormSaga(
 
     const isValidResponse = yield validateResponse(response);
     if (isValidResponse) {
-      yield put({
-        type: ReduxActionTypes.UPDATE_DATASOURCE_REFS,
-        payload: response.data,
-      });
+      // yield put({
+      //   type: ReduxActionTypes.UPDATE_DATASOURCE_REFS,
+      //   payload: response.data,
+      // });
       yield put({
         type: ReduxActionTypes.CREATE_DATASOURCE_SUCCESS,
         payload: response.data,
@@ -1045,9 +1045,12 @@ export function* watchDatasourcesSagas() {
       createTempDatasourceFromFormSaga,
     ),
     takeEvery(ReduxActionTypes.UPDATE_DATASOURCE_INIT, updateDatasourceSaga),
-    takeEvery(ReduxActionTypes.SAVE_DATASOURCE_NAME, saveDatasourceNameSaga),
     takeEvery(
-      ReduxActionErrorTypes.SAVE_DATASOURCE_NAME_ERROR,
+      ReduxActionTypes.UPDATE_DATASOURCE_NAME,
+      updateDatasourceNameSaga,
+    ),
+    takeEvery(
+      ReduxActionErrorTypes.UPDATE_DATASOURCE_NAME_ERROR,
       handleDatasourceNameChangeFailureSaga,
     ),
     takeEvery(ReduxActionTypes.TEST_DATASOURCE_INIT, testDatasourceSaga),
