@@ -95,6 +95,7 @@ import { inGuidedTour } from "selectors/onboardingSelectors";
 import { updateReplayEntity } from "actions/pageActions";
 import OAuthApi from "api/OAuthApi";
 import { AppState } from "reducers";
+import { TEMP_DATASOURCE_ID } from "constants/Datasource";
 
 function* fetchDatasourcesSaga() {
   try {
@@ -597,7 +598,7 @@ function* createTempDatasourceFromFormSaga(
   actionPayload: ReduxAction<CreateDatasourceConfig>,
 ) {
   const payload = {
-    id: "TEMP-ID-1",
+    id: TEMP_DATASOURCE_ID,
     name: "New Datasource",
     type: (actionPayload.payload as any).type,
     pluginId: actionPayload.payload.pluginId,

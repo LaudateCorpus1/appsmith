@@ -9,6 +9,7 @@ import {
   DatasourceStructure,
   MockDatasource,
 } from "entities/Datasource";
+import { TEMP_DATASOURCE_ID } from "constants/Datasource";
 
 export interface DatasourceDataState {
   list: Datasource[];
@@ -229,7 +230,7 @@ const datasourceReducer = createReducer(initialState, {
       ...state,
       loading: false,
       list: state.list.map((datasource) => {
-        if (datasource.id === "TEMP-ID-1") return action.payload;
+        if (datasource.id === TEMP_DATASOURCE_ID) return action.payload;
 
         return datasource;
       }),
@@ -241,7 +242,9 @@ const datasourceReducer = createReducer(initialState, {
     return {
       ...state,
       isDeleting: false,
-      list: state.list.filter((datasource) => datasource.id !== "TEMP-ID-1"),
+      list: state.list.filter(
+        (datasource) => datasource.id !== TEMP_DATASOURCE_ID,
+      ),
     };
   },
   [ReduxActionTypes.UPDATE_DATASOURCE_NAME_SUCCESS]: (
