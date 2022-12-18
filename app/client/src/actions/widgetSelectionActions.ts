@@ -1,9 +1,20 @@
-import { ReduxActionTypes, ReduxAction } from "constants/ReduxActionConstants";
+import {
+  ReduxActionTypes,
+  ReduxAction,
+} from "@appsmith/constants/ReduxActionConstants";
+import { CanvasWidgetsStructureReduxState } from "reducers/entityReducers/canvasWidgetsStructureReducer";
+
+export type SelectWidgetActionPayload = {
+  widgetId?: string;
+  isMultiSelect?: boolean;
+};
+
+export type SelectMultipleWidgetsActionPayload = { widgetIds?: string[] };
 
 export const selectWidgetAction = (
   widgetId?: string,
   isMultiSelect?: boolean,
-): ReduxAction<{ widgetId?: string; isMultiSelect?: boolean }> => ({
+): ReduxAction<SelectWidgetActionPayload> => ({
   type: ReduxActionTypes.SELECT_WIDGET,
   payload: { widgetId, isMultiSelect },
 });
@@ -11,7 +22,7 @@ export const selectWidgetAction = (
 export const selectWidgetInitAction = (
   widgetId?: string,
   isMultiSelect?: boolean,
-): ReduxAction<{ widgetId?: string; isMultiSelect?: boolean }> => ({
+): ReduxAction<SelectWidgetActionPayload> => ({
   type: ReduxActionTypes.SELECT_WIDGET_INIT,
   payload: { widgetId, isMultiSelect },
 });
@@ -24,7 +35,7 @@ export const deselectAllInitAction = () => {
 
 export const selectMultipleWidgetsAction = (
   widgetIds?: string[],
-): ReduxAction<{ widgetIds?: string[] }> => {
+): ReduxAction<SelectMultipleWidgetsActionPayload> => {
   return {
     type: ReduxActionTypes.SELECT_MULTIPLE_WIDGETS,
     payload: { widgetIds },
@@ -33,7 +44,7 @@ export const selectMultipleWidgetsAction = (
 
 export const silentAddSelectionsAction = (
   widgetIds?: string[],
-): ReduxAction<{ widgetIds?: string[] }> => {
+): ReduxAction<SelectMultipleWidgetsActionPayload> => {
   return {
     type: ReduxActionTypes.SELECT_WIDGETS,
     payload: { widgetIds },
@@ -42,7 +53,7 @@ export const silentAddSelectionsAction = (
 
 export const deselectMultipleWidgetsAction = (
   widgetIds?: string[],
-): ReduxAction<{ widgetIds?: string[] }> => {
+): ReduxAction<SelectMultipleWidgetsActionPayload> => {
   return {
     type: ReduxActionTypes.DESELECT_WIDGETS,
     payload: { widgetIds },
@@ -62,6 +73,16 @@ export const selectMultipleWidgetsInitAction = (widgetIds: string[]) => {
   };
 };
 
+export const deselectModalWidgetAction = (
+  modalId: string,
+  modalWidgetChildren?: CanvasWidgetsStructureReduxState[],
+) => {
+  return {
+    type: ReduxActionTypes.DESELECT_MODAL_WIDGETS,
+    payload: { modalId, modalWidgetChildren },
+  };
+};
+
 export const shiftSelectWidgetsEntityExplorerInitAction = (
   widgetId: string,
   siblingWidgets: string[],
@@ -69,3 +90,10 @@ export const shiftSelectWidgetsEntityExplorerInitAction = (
   type: ReduxActionTypes.SHIFT_SELECT_WIDGET_INIT,
   payload: { widgetId, siblingWidgets },
 });
+
+export const appendSelectedWidgetToUrl = (selectedWidgets: string[]) => {
+  return {
+    type: ReduxActionTypes.APPEND_SELECTED_WIDGET_TO_URL,
+    payload: { selectedWidgets },
+  };
+};

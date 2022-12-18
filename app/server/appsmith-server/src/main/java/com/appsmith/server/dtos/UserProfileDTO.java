@@ -13,7 +13,7 @@ public class UserProfileDTO {
 
     String email;
 
-    Set<String> organizationIds;
+    Set<String> workspaceIds;
 
     String username;
 
@@ -35,6 +35,9 @@ public class UserProfileDTO {
     @JsonProperty("isConfigurable")
     boolean isConfigurable = false;
 
+    @JsonProperty("adminSettingsVisible")
+    boolean adminSettingsVisible = false;
+
     CommentOnboardingState commentOnboardingState;
 
     String photoId;
@@ -45,7 +48,7 @@ public class UserProfileDTO {
 
     boolean enableTelemetry = false;
 
-    Map<String, Object> metadata = new HashMap<>();
+    Map<String, Object> idToken = new HashMap<>();
 
     public boolean isAccountNonExpired() {
         return this.isEnabled;

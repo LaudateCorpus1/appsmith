@@ -4,7 +4,8 @@ import styled from "styled-components";
 import { createMessage, ENTER_VIDEO_URL } from "@appsmith/constants/messages";
 export interface VideoComponentProps {
   url?: string;
-  autoplay?: boolean;
+  autoPlay?: boolean;
+  playing?: boolean;
   controls?: boolean;
   onStart?: () => void;
   onPlay?: () => void;
@@ -15,6 +16,9 @@ export interface VideoComponentProps {
   onSeek?: () => void;
   onError?: () => void;
   player?: Ref<ReactPlayer>;
+  backgroundColor?: string;
+  borderRadius?: string;
+  boxShadow?: string;
 }
 
 const ErrorContainer = styled.div`
@@ -25,11 +29,27 @@ const ErrorContainer = styled.div`
   height: 100%;
 `;
 
+const VideoWrapper = styled.div<{
+  borderRadius?: string;
+  boxShadow?: string;
+  backgroundColor?: string;
+}>`
+  height: 100%;
+
+  & video,
+  & > div {
+    background-color: ${({ backgroundColor }) => backgroundColor};
+    border-radius: ${({ borderRadius }) => borderRadius};
+    box-shadow: ${({ boxShadow }) => boxShadow} !important;
+    overflow: hidden;
+  }
+`;
+
 const Error = styled.span``;
 
 export default function VideoComponent(props: VideoComponentProps) {
   const {
-    autoplay,
+    autoPlay,
     controls,
     onEnded,
     onError,
@@ -40,27 +60,34 @@ export default function VideoComponent(props: VideoComponentProps) {
     onSeek,
     onStart,
     player,
+    playing,
     url,
   } = props;
   return url ? (
-    <ReactPlayer
-      controls={controls || true}
-      height="100%"
-      muted={autoplay}
-      onEnded={onEnded}
-      onError={onError}
-      onPause={onPause}
-      onPlay={onPlay}
-      onProgress={onProgress}
-      onReady={onReady}
-      onSeek={onSeek}
-      onStart={onStart}
-      pip={false}
-      playing={autoplay}
-      ref={player}
-      url={url}
-      width="100%"
-    />
+    <VideoWrapper
+      backgroundColor={props.backgroundColor}
+      borderRadius={props.borderRadius}
+      boxShadow={props.boxShadow}
+    >
+      <ReactPlayer
+        controls={controls || true}
+        height="100%"
+        muted={autoPlay}
+        onEnded={onEnded}
+        onError={onError}
+        onPause={onPause}
+        onPlay={onPlay}
+        onProgress={onProgress}
+        onReady={onReady}
+        onSeek={onSeek}
+        onStart={onStart}
+        pip={false}
+        playing={playing}
+        ref={player}
+        url={url}
+        width="100%"
+      />
+    </VideoWrapper>
   ) : (
     <ErrorContainer>
       <Error>{createMessage(ENTER_VIDEO_URL)}</Error>

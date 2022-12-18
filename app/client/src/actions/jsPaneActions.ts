@@ -1,11 +1,17 @@
-import { ReduxAction, ReduxActionTypes } from "constants/ReduxActionConstants";
+import {
+  ReduxAction,
+  ReduxActionTypes,
+} from "@appsmith/constants/ReduxActionConstants";
 import { JSCollection, JSAction } from "entities/JSCollection";
-import { RefactorAction } from "api/JSActionAPI";
+import { RefactorAction, SetFunctionPropertyPayload } from "api/JSActionAPI";
+import { EventLocation } from "utils/AnalyticsUtil";
+
 export const createNewJSCollection = (
   pageId: string,
-): ReduxAction<{ pageId: string }> => ({
+  from: EventLocation,
+): ReduxAction<{ pageId: string; from: EventLocation }> => ({
   type: ReduxActionTypes.CREATE_NEW_JS_ACTION,
-  payload: { pageId },
+  payload: { pageId: pageId, from: from },
 });
 
 export const updateJSCollection = (
@@ -51,7 +57,7 @@ export const refactorJSCollectionAction = (payload: {
   };
 };
 
-export const executeJSFunction = (payload: {
+export const executeJSFunctionInit = (payload: {
   collectionName: string;
   action: JSAction;
   collectionId: string;
@@ -61,3 +67,60 @@ export const executeJSFunction = (payload: {
     payload,
   };
 };
+
+export const startExecutingJSFunction = (payload: {
+  collectionName: string;
+  action: JSAction;
+  collectionId: string;
+  from: EventLocation;
+}) => {
+  return {
+    type: ReduxActionTypes.START_EXECUTE_JS_FUNCTION,
+    payload,
+  };
+};
+
+export const updateFunctionProperty = (payload: SetFunctionPropertyPayload) => {
+  return {
+    type: ReduxActionTypes.SET_FUNCTION_PROPERTY,
+    payload,
+  };
+};
+
+export const updateJSFunction = (payload: SetFunctionPropertyPayload) => {
+  return {
+    type: ReduxActionTypes.UPDATE_JS_FUNCTION_PROPERTY_INIT,
+    payload,
+  };
+};
+
+export const setActiveJSAction = (payload: {
+  jsCollectionId: string;
+  jsActionId: string;
+}) => {
+  return {
+    type: ReduxActionTypes.SET_ACTIVE_JS_ACTION,
+    payload,
+  };
+};
+
+export const setJsPaneConfigSelectedTabIndex: (
+  payload: number,
+) => ReduxAction<{ selectedTabIndex: number }> = (payload: number) => ({
+  type: ReduxActionTypes.SET_JS_PANE_CONFIG_SELECTED_TAB,
+  payload: { selectedTabIndex: payload },
+});
+
+export const setJsPaneResponseSelectedTab: (
+  payload: string,
+) => ReduxAction<{ selectedTab: string }> = (payload: string) => ({
+  type: ReduxActionTypes.SET_JS_PANE_RESPONSE_SELECTED_TAB,
+  payload: { selectedTab: payload },
+});
+
+export const setJsPaneResponsePaneHeight: (
+  payload: number,
+) => ReduxAction<{ height: number }> = (payload: number) => ({
+  type: ReduxActionTypes.SET_JS_PANE_RESPONSE_PANE_HEIGHT,
+  payload: { height: payload },
+});

@@ -2,6 +2,7 @@ package com.external.plugins.utils;
 
 import com.appsmith.external.exceptions.pluginExceptions.AppsmithPluginError;
 import com.appsmith.external.exceptions.pluginExceptions.AppsmithPluginException;
+import com.appsmith.external.helpers.PluginUtils;
 import com.appsmith.external.models.ActionConfiguration;
 import com.appsmith.external.models.DBAuth;
 import com.appsmith.external.models.DatasourceConfiguration;
@@ -14,23 +15,31 @@ import com.external.plugins.commands.Find;
 import com.external.plugins.commands.Insert;
 import com.external.plugins.commands.MongoCommand;
 import com.external.plugins.commands.UpdateMany;
+
+import org.bson.BsonInvalidOperationException;
 import org.bson.Document;
 import org.bson.json.JsonParseException;
 import org.bson.types.Decimal128;
 import org.bson.types.ObjectId;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.springframework.util.StringUtils;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
+import static com.appsmith.external.helpers.PluginUtils.STRING_TYPE;
+import static com.appsmith.external.helpers.PluginUtils.getDataValueSafelyFromFormData;
+import static com.external.plugins.constants.FieldName.BODY;
 import static com.external.plugins.constants.FieldName.COMMAND;
 import static com.external.plugins.constants.FieldName.RAW;
 
@@ -39,13 +48,31 @@ public class MongoPluginUtils {
     public static Document parseSafely(String fieldName, String input) {
         try {
             return Document.parse(input);
-        } catch (JsonParseException e) {
+        } catch (JsonParseException | BsonInvalidOperationException e) {
             throw new AppsmithPluginException(AppsmithPluginError.PLUGIN_EXECUTE_ARGUMENT_ERROR, fieldName + " could not be parsed into expected JSON format.");
         }
     }
 
+    public static Object parseSafelyDocumentAndArrayOfDocuments(String fieldName, String input){
+        try {
+            return parseSafely(fieldName, input);
+        } catch (AppsmithPluginException e) {
+            try {
+                List<Document> parsedDocumentList = new ArrayList<>();
+                JSONArray rawInputJsonArray  = new JSONArray(input);
+                for (int i=0; i < rawInputJsonArray.length(); i++) {
+                    parsedDocumentList.add(parseSafely(fieldName, rawInputJsonArray.getJSONObject(i).toString()));
+                }
+                return parsedDocumentList;
+            } catch (JSONException ne) {
+                throw new AppsmithPluginException(AppsmithPluginError.PLUGIN_EXECUTE_ARGUMENT_ERROR, fieldName + " could not be parsed into expected JSON format.");
+            }
+        }
+   
+    }
+
     public static Boolean isRawCommand(Map<String, Object> formData) {
-        String command = (String) formData.getOrDefault(COMMAND, null);
+        String command = PluginUtils.getDataValueSafelyFromFormData(formData, COMMAND, null);
         return RAW.equals(command);
     }
 
@@ -54,34 +81,8 @@ public class MongoPluginUtils {
         if (formData != null && !formData.isEmpty()) {
             // If its not raw command, then it must be one of the mongo form commands
             if (!isRawCommand(formData)) {
-
                 // Parse the commands into raw appropriately
-                MongoCommand command = null;
-                switch ((String) formData.getOrDefault(COMMAND, "")) {
-                    case "INSERT":
-                        command = new Insert(actionConfiguration);
-                        break;
-                    case "FIND":
-                        command = new Find(actionConfiguration);
-                        break;
-                    case "UPDATE":
-                        command = new UpdateMany(actionConfiguration);
-                        break;
-                    case "DELETE":
-                        command = new Delete(actionConfiguration);
-                        break;
-                    case "COUNT":
-                        command = new Count(actionConfiguration);
-                        break;
-                    case "DISTINCT":
-                        command = new Distinct(actionConfiguration);
-                        break;
-                    case "AGGREGATE":
-                        command = new Aggregate(actionConfiguration);
-                        break;
-                    default:
-                        throw new AppsmithPluginException(AppsmithPluginError.PLUGIN_EXECUTE_ARGUMENT_ERROR, "No valid mongo command found. Please select a command from the \"Command\" dropdown and try again");
-                }
+                MongoCommand command = getMongoCommand(actionConfiguration);
                 if (!command.isValid()) {
                     throw new AppsmithPluginException(AppsmithPluginError.PLUGIN_EXECUTE_ARGUMENT_ERROR, "Try again after configuring the fields : " + command.getFieldNamesWithNoConfiguration());
                 }
@@ -92,17 +93,59 @@ public class MongoPluginUtils {
 
         // We reached here. This means either this is a RAW command input or some configuration error has happened
         // in which case, we default to RAW
-        return actionConfiguration.getBody();
+        return PluginUtils.getDataValueSafelyFromFormData(formData, BODY, PluginUtils.STRING_TYPE);
+    }
+
+    private static MongoCommand getMongoCommand(ActionConfiguration actionConfiguration) throws AppsmithPluginException {
+        Map<String, Object> formData = actionConfiguration.getFormData();
+        MongoCommand command;
+        switch (getDataValueSafelyFromFormData(formData, COMMAND, STRING_TYPE, "")) {
+            case "INSERT":
+                command = new Insert(actionConfiguration);
+                break;
+            case "FIND":
+                command = new Find(actionConfiguration);
+                break;
+            case "UPDATE":
+                command = new UpdateMany(actionConfiguration);
+                break;
+            case "DELETE":
+                command = new Delete(actionConfiguration);
+                break;
+            case "COUNT":
+                command = new Count(actionConfiguration);
+                break;
+            case "DISTINCT":
+                command = new Distinct(actionConfiguration);
+                break;
+            case "AGGREGATE":
+                command = new Aggregate(actionConfiguration);
+                break;
+            default:
+                throw new AppsmithPluginException(AppsmithPluginError.PLUGIN_EXECUTE_ARGUMENT_ERROR,
+                        "No valid mongo command found. Please select a command from the \"Command\" dropdown and try " +
+                                "again");
+        }
+
+        return command;
     }
 
     public static String getDatabaseName(DatasourceConfiguration datasourceConfiguration) {
+        String databaseName = null;
+
         // Explicitly set default database.
-        String databaseName = datasourceConfiguration.getConnection().getDefaultDatabaseName();
+        if (datasourceConfiguration.getConnection() != null) {
+            databaseName = datasourceConfiguration.getConnection().getDefaultDatabaseName();
+        }
 
         // If that's not available, pick the authentication database.
         final DBAuth authentication = (DBAuth) datasourceConfiguration.getAuthentication();
-        if (StringUtils.isEmpty(databaseName) && authentication != null) {
+        if (!StringUtils.hasLength(databaseName) && authentication != null) {
             databaseName = authentication.getDatabaseName();
+        }
+
+        if (databaseName == null) {
+            throw new AppsmithPluginException(AppsmithPluginError.PLUGIN_DATASOURCE_ARGUMENT_ERROR, "Missing default database name.");
         }
 
         return databaseName;
@@ -202,6 +245,11 @@ public class MongoPluginUtils {
 
     public static String urlEncode(String text) {
         return URLEncoder.encode(text, StandardCharsets.UTF_8);
+    }
+
+    public static String getRawQuery(ActionConfiguration actionConfiguration) {
+        MongoCommand command = getMongoCommand(actionConfiguration);
+        return command.getRawQuery();
     }
 
 }

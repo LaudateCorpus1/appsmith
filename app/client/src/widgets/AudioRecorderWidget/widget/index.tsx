@@ -8,31 +8,35 @@ import AudioRecorderComponent from "../component";
 import { DerivedPropertiesMap } from "utils/WidgetFactory";
 import { createBlobUrl } from "utils/AppsmithUtils";
 import { FileDataTypes } from "widgets/constants";
+import { Stylesheet } from "entities/AppTheming";
 
 export interface AudioRecorderWidgetProps extends WidgetProps {
-  backgroundColor: string;
+  accentColor: string;
+  borderRadius: string;
+  boxShadow?: string;
   iconColor: string;
   isDisabled: boolean;
   isValid: boolean;
   onRecordingStart?: string;
   onRecordingComplete?: string;
   blobURL?: string;
+  isDirty: boolean;
 }
 
 class AudioRecorderWidget extends BaseWidget<
   AudioRecorderWidgetProps,
   WidgetState
 > {
-  static getPropertyPaneConfig() {
+  static getPropertyPaneContentConfig() {
     return [
       {
         sectionName: "General",
         children: [
           {
-            propertyName: "isDisabled",
-            label: "Disabled",
+            propertyName: "isVisible",
+            label: "Visible",
+            helpText: "Controls the visibility of the widget",
             controlType: "SWITCH",
-            helpText: "Disables input to this widget",
             isJSConvertible: true,
             isBindProperty: true,
             isTriggerProperty: false,
@@ -41,10 +45,10 @@ class AudioRecorderWidget extends BaseWidget<
             },
           },
           {
-            propertyName: "isVisible",
-            label: "Visible",
-            helpText: "Controls the visibility of the widget",
+            propertyName: "isDisabled",
+            label: "Disabled",
             controlType: "SWITCH",
+            helpText: "Disables input to this widget",
             isJSConvertible: true,
             isBindProperty: true,
             isTriggerProperty: false,
@@ -88,17 +92,13 @@ class AudioRecorderWidget extends BaseWidget<
           },
         ],
       },
+    ];
+  }
+  static getPropertyPaneStyleConfig() {
+    return [
       {
         sectionName: "Styles",
         children: [
-          {
-            propertyName: "backgroundColor",
-            helpText: "Sets the background color of the widget",
-            label: "Background color",
-            controlType: "COLOR_PICKER",
-            isBindProperty: false,
-            isTriggerProperty: false,
-          },
           {
             propertyName: "iconColor",
             helpText: "Sets the icon color of the widget",
@@ -107,9 +107,54 @@ class AudioRecorderWidget extends BaseWidget<
             isBindProperty: false,
             isTriggerProperty: false,
           },
+          {
+            propertyName: "accentColor",
+            helpText: "Changes the color of the recorder button",
+            label: "Button Color",
+            controlType: "COLOR_PICKER",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+        ],
+      },
+      {
+        sectionName: "Border and Shadow",
+        children: [
+          {
+            propertyName: "borderRadius",
+            label: "Border Radius",
+            helpText:
+              "Rounds the corners of the icon button's outer border edge",
+            controlType: "BORDER_RADIUS_OPTIONS",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            propertyName: "boxShadow",
+            label: "Box Shadow",
+            helpText:
+              "Enables you to cast a drop shadow from the frame of the widget",
+            controlType: "BOX_SHADOW_OPTIONS",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
         ],
       },
     ];
+  }
+
+  static getStylesheetConfig(): Stylesheet {
+    return {
+      accentColor: "{{appsmith.theme.colors.primaryColor}}",
+      borderRadius: "{{appsmith.theme.borderRadius.appBorderRadius}}",
+      boxShadow: "none",
+    };
   }
 
   static getMetaPropertiesMap(): Record<string, any> {
@@ -117,6 +162,7 @@ class AudioRecorderWidget extends BaseWidget<
       blobURL: undefined,
       dataURL: undefined,
       rawBinary: undefined,
+      isDirty: false,
     };
   }
 
@@ -125,6 +171,10 @@ class AudioRecorderWidget extends BaseWidget<
   }
 
   handleRecordingStart = () => {
+    if (!this.props.isDirty) {
+      this.props.updateWidgetMetaProperty("isDirty", true);
+    }
+
     if (this.props.blobURL) {
       URL.revokeObjectURL(this.props.blobURL);
     }
@@ -174,7 +224,6 @@ class AudioRecorderWidget extends BaseWidget<
 
   getPageView() {
     const {
-      backgroundColor,
       blobURL,
       bottomRow,
       iconColor,
@@ -188,8 +237,10 @@ class AudioRecorderWidget extends BaseWidget<
 
     return (
       <AudioRecorderComponent
-        backgroundColor={backgroundColor}
+        accentColor={this.props.accentColor}
         blobUrl={blobURL}
+        borderRadius={this.props.borderRadius}
+        boxShadow={this.props.boxShadow}
         height={(bottomRow - topRow) * parentRowSpace}
         iconColor={iconColor}
         isDisabled={isDisabled}

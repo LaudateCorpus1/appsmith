@@ -14,13 +14,15 @@ import {
   dataSetForNorthAmerica,
   dataSetForOceania,
   dataSetForSouthAmerica,
+  dataSetForUSA,
   dataSetForWorld,
   dataSetForWorldWithAntarctica,
   MapColorObject,
   MapTypes,
 } from "../constants";
 import { MapType } from "../component";
-import { AutocompleteDataType } from "utils/autocomplete/TernServer";
+import { Stylesheet } from "entities/AppTheming";
+import { AutocompleteDataType } from "utils/autocomplete/CodemirrorTernService";
 
 const MapChartComponent = lazy(() =>
   retryPromise(() =>
@@ -37,6 +39,7 @@ const dataSetMapping: Record<MapType, any> = {
   [MapTypes.ASIA]: dataSetForAsia,
   [MapTypes.OCEANIA]: dataSetForOceania,
   [MapTypes.AFRICA]: dataSetForAfrica,
+  [MapTypes.USA]: dataSetForUSA,
 };
 
 // A hook to update the corresponding dataset when map type is changed
@@ -57,10 +60,10 @@ const updateDataSet = (
 };
 
 class MapChartWidget extends BaseWidget<MapChartWidgetProps, WidgetState> {
-  static getPropertyPaneConfig() {
+  static getPropertyPaneContentConfig() {
     return [
       {
-        sectionName: "General",
+        sectionName: "Data",
         children: [
           {
             helpText: "Sets the map type",
@@ -100,6 +103,10 @@ class MapChartWidget extends BaseWidget<MapChartWidgetProps, WidgetState> {
                 label: "Africa",
                 value: MapTypes.AFRICA,
               },
+              {
+                label: "USA",
+                value: MapTypes.USA,
+              },
             ],
             isJSconvertible: true,
             isBindProperty: true,
@@ -117,39 +124,15 @@ class MapChartWidget extends BaseWidget<MapChartWidgetProps, WidgetState> {
                   MapTypes.ASIA,
                   MapTypes.OCEANIA,
                   MapTypes.AFRICA,
+                  MapTypes.USA,
                 ],
               },
             },
           },
           {
-            helpText: "Sets the map title",
-            placeholderText: "Enter title",
-            propertyName: "mapTitle",
-            label: "Title",
-            controlType: "INPUT_TEXT",
-            isBindProperty: true,
-            isTriggerProperty: false,
-            validation: { type: ValidationTypes.TEXT },
-          },
-          {
-            propertyName: "isVisible",
-            label: "Visible",
-            helpText: "Controls the visibility of the widget",
-            controlType: "SWITCH",
-            isJSConvertible: true,
-            isBindProperty: true,
-            isTriggerProperty: false,
-            validation: { type: ValidationTypes.BOOLEAN },
-          },
-        ],
-      },
-      {
-        sectionName: "Map Chart Data",
-        children: [
-          {
             helpText: "Populates the map with the data",
             propertyName: "data",
-            label: "Data",
+            label: "Chart Data",
             controlType: "INPUT_TEXT",
             isBindProperty: true,
             isTriggerProperty: false,
@@ -185,6 +168,31 @@ class MapChartWidget extends BaseWidget<MapChartWidgetProps, WidgetState> {
             evaluationSubstitutionType:
               EvaluationSubstitutionType.SMART_SUBSTITUTE,
           },
+        ],
+      },
+      {
+        sectionName: "General",
+        children: [
+          {
+            helpText: "Sets the map title",
+            placeholderText: "Enter title",
+            propertyName: "mapTitle",
+            label: "Title",
+            controlType: "INPUT_TEXT",
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            propertyName: "isVisible",
+            label: "Visible",
+            helpText: "Controls the visibility of the widget",
+            controlType: "SWITCH",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.BOOLEAN },
+          },
           {
             propertyName: "showLabels",
             label: "Show Labels",
@@ -198,7 +206,27 @@ class MapChartWidget extends BaseWidget<MapChartWidgetProps, WidgetState> {
         ],
       },
       {
-        sectionName: "Styles",
+        sectionName: "Events",
+        children: [
+          {
+            helpText:
+              "Triggers an action when the map chart data point is clicked",
+            propertyName: "onDataPointClick",
+            label: "onDataPointClick",
+            controlType: "ACTION_SELECTOR",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: true,
+          },
+        ],
+      },
+    ];
+  }
+
+  static getPropertyPaneStyleConfig() {
+    return [
+      {
+        sectionName: "General",
         children: [
           {
             helpText:
@@ -265,17 +293,29 @@ class MapChartWidget extends BaseWidget<MapChartWidgetProps, WidgetState> {
         ],
       },
       {
-        sectionName: "Actions",
+        sectionName: "Border and Shadow",
         children: [
           {
+            propertyName: "borderRadius",
+            label: "Border Radius",
             helpText:
-              "Triggers an action when the map chart data point is clicked",
-            propertyName: "onDataPointClick",
-            label: "onDataPointClick",
-            controlType: "ACTION_SELECTOR",
+              "Rounds the corners of the icon button's outer border edge",
+            controlType: "BORDER_RADIUS_OPTIONS",
             isJSConvertible: true,
             isBindProperty: true,
-            isTriggerProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            propertyName: "boxShadow",
+            label: "Box Shadow",
+            helpText:
+              "Enables you to cast a drop shadow from the frame of the widget",
+            controlType: "BOX_SHADOW_OPTIONS",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
           },
         ],
       },
@@ -290,6 +330,14 @@ class MapChartWidget extends BaseWidget<MapChartWidgetProps, WidgetState> {
 
   static getWidgetType(): WidgetType {
     return "MAP_CHART_WIDGET";
+  }
+
+  static getStylesheetConfig(): Stylesheet {
+    return {
+      borderRadius: "{{appsmith.theme.borderRadius.appBorderRadius}}",
+      boxShadow: "{{appsmith.theme.boxShadow.appBoxShadow}}",
+      fontFamily: "{{appsmith.theme.fontFamily.appFont}}",
+    };
   }
 
   handleDataPointClick = (evt: any) => {
@@ -317,9 +365,12 @@ class MapChartWidget extends BaseWidget<MapChartWidgetProps, WidgetState> {
     return (
       <Suspense fallback={<Skeleton />}>
         <MapChartComponent
+          borderRadius={this.props.borderRadius}
+          boxShadow={this.props.boxShadow}
           caption={mapTitle}
           colorRange={colorRange}
           data={data}
+          fontFamily={this.props.fontFamily ?? "Nunito Sans"}
           isVisible={isVisible}
           onDataPointClick={this.handleDataPointClick}
           showLabels={showLabels}
@@ -336,6 +387,9 @@ export interface MapChartWidgetProps extends WidgetProps {
   onDataPointClick?: string;
   showLabels: boolean;
   colorRange: MapColorObject[];
+  borderRadius?: string;
+  boxShadow?: string;
+  fontFamily?: string;
 }
 
 export default MapChartWidget;

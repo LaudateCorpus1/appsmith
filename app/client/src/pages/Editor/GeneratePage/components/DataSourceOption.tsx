@@ -1,17 +1,18 @@
 import React from "react";
 import styled from "styled-components";
 import { Colors } from "constants/Colors";
+import { useSelector } from "react-redux";
+import { getPluginImages } from "selectors/entitiesSelector";
 import {
+  Classes,
   DropdownOption,
   RenderDropdownOptionType,
-} from "components/ads/Dropdown";
-import { useSelector } from "react-redux";
-import { getPluginImages } from "../../../../selectors/entitiesSelector";
-import { Classes } from "../../../../components/ads/common";
-import Text, { TextType } from "components/ads/Text";
+  Text,
+  TextType,
+  TooltipComponent,
+} from "design-system";
 import { FormIcons } from "icons/FormIcons";
 import _ from "lodash";
-import TooltipComponent from "components/ads/Tooltip";
 
 // ---------- Helpers and constants ----------
 
@@ -25,9 +26,7 @@ const OptionWrapper = styled.div<{
   width?: string;
 }>`
   padding: ${(props) =>
-    props.selected
-      ? `${props.theme.spaces[1]}px 0px`
-      : `${props.theme.spaces[3]}px ${props.theme.spaces[5]}px`};
+    `${props.theme.spaces[3]}px ${props.theme.spaces[5]}px`};
   ${(props) => (!props.disabled ? "cursor: pointer" : "")};
   display: flex;
   align-items: center;
@@ -54,8 +53,9 @@ const OptionWrapper = styled.div<{
     }
   }
 
-  &:hover {
-    background-color: ${Colors.Gallery};
+  &:hover,
+  &.highlight-option {
+    background-color: ${Colors.GALLERY_1};
 
     &&& svg {
       rect {
@@ -99,6 +99,7 @@ interface DataSourceOptionType extends RenderDropdownOptionType {
 function DataSourceOption({
   cypressSelector,
   extraProps,
+  isHighlighted,
   isSelectedNode,
   option: dropdownOption,
   optionClickHandler,
@@ -126,9 +127,14 @@ function DataSourceOption({
       disabled={
         isSupportedForTemplate || isSelectedNode || isConnectNewDataSourceBtn
       }
+      styles={{
+        width: "100%",
+      }}
     >
       <OptionWrapper
-        className="t--dropdown-option"
+        className={`t--dropdown-option ${
+          isHighlighted ? "highlight-option" : ""
+        }`}
         data-cy={optionCypressSelector}
         disabled={isNotSupportedDatasource}
         key={(dropdownOption as DropdownOption).id}

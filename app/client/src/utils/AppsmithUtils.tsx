@@ -1,60 +1,15 @@
-import {
-  CurrentApplicationData,
-  Page,
-  ReduxAction,
-} from "constants/ReduxActionConstants";
 import { getAppsmithConfigs } from "@appsmith/configs";
 import * as Sentry from "@sentry/react";
 import AnalyticsUtil from "./AnalyticsUtil";
-import FormControlRegistry from "./FormControlRegistry";
 import { Property } from "api/ActionAPI";
 import _ from "lodash";
 import { ActionDataState } from "reducers/entityReducers/actionsReducer";
 import * as log from "loglevel";
-import { LogLevelDesc } from "loglevel";
-import produce from "immer";
-import { AppIconCollection, AppIconName } from "components/ads/AppIcon";
+import { AppIconCollection, AppIconName } from "design-system";
 import { ERROR_CODES } from "@appsmith/constants/ApiConstants";
 import { createMessage, ERROR_500 } from "@appsmith/constants/messages";
-import localStorage from "utils/localStorage";
-import { APP_MODE } from "entities/App";
-import { trimQueryString } from "./helpers";
-import {
-  getApplicationEditorPageURL,
-  getApplicationViewerPageURL,
-} from "constants/routes";
-
-export const createReducer = (
-  initialState: any,
-  handlers: { [type: string]: (state: any, action: any) => any },
-) => {
-  return function reducer(state = initialState, action: ReduxAction<any>) {
-    if (handlers.hasOwnProperty(action.type)) {
-      return handlers[action.type](state, action);
-    } else {
-      return state;
-    }
-  };
-};
-
-export const createImmerReducer = (
-  initialState: any,
-  handlers: { [type: string]: any },
-) => {
-  return function reducer(state = initialState, action: ReduxAction<any>) {
-    if (handlers.hasOwnProperty(action.type)) {
-      return produce(handlers[action.type])(state, action);
-    } else {
-      return state;
-    }
-  };
-};
-
-export const appInitializer = () => {
-  FormControlRegistry.registerFormControlBuilders();
-  const appsmithConfigs = getAppsmithConfigs();
-  log.setLevel(getEnvLogLevel(appsmithConfigs.logLevel));
-};
+import { JSCollectionData } from "reducers/entityReducers/jsActionsReducer";
+import { osName } from "react-device-detect";
 
 export const initializeAnalyticsAndTrackers = () => {
   const appsmithConfigs = getAppsmithConfigs();
@@ -64,6 +19,24 @@ export const initializeAnalyticsAndTrackers = () => {
       window.Sentry = Sentry;
       Sentry.init({
         ...appsmithConfigs.sentry,
+        beforeSend(event) {
+          if (
+            event.exception &&
+            Array.isArray(event.exception.values) &&
+            event.exception.values[0].value &&
+            event.exception.values[0].type === "ChunkLoadError"
+          ) {
+            // Only log ChunkLoadErrors after the 2 retires
+            if (
+              !event.exception.values[0].value.includes(
+                "failed after 2 retries",
+              )
+            ) {
+              return null;
+            }
+          }
+          return event;
+        },
         beforeBreadcrumb(breadcrumb) {
           if (
             breadcrumb.category === "console" &&
@@ -116,6 +89,56 @@ export const mapToPropList = (map: Record<string, string>): Property[] => {
     return { key: key, value: value };
   });
 };
+
+export const INTERACTION_ANALYTICS_EVENT = "INTERACTION_ANALYTICS_EVENT";
+
+export type InteractionAnalyticsEventDetail = {
+  key?: string;
+  propertyName?: string;
+  propertyType?: string;
+  widgetType?: string;
+};
+
+export const interactionAnalyticsEvent = (
+  detail: InteractionAnalyticsEventDetail = {},
+) =>
+  new CustomEvent(INTERACTION_ANALYTICS_EVENT, {
+    bubbles: true,
+    detail,
+  });
+
+export function emitInteractionAnalyticsEvent<T extends HTMLElement>(
+  element: T | null,
+  args: Record<string, unknown>,
+) {
+  element?.dispatchEvent(interactionAnalyticsEvent(args));
+}
+
+export const DS_EVENT = "DS_EVENT";
+
+export enum DSEventTypes {
+  KEYPRESS = "KEYPRESS",
+}
+
+export type DSEventDetail = {
+  component: string;
+  event: DSEventTypes;
+  meta: Record<string, unknown>;
+};
+
+export function createDSEvent(detail: DSEventDetail) {
+  return new CustomEvent(DS_EVENT, {
+    bubbles: true,
+    detail,
+  });
+}
+
+export function emitDSEvent<T extends HTMLElement>(
+  element: T | null,
+  args: DSEventDetail,
+) {
+  element?.dispatchEvent(createDSEvent(args));
+}
 
 export const getNextEntityName = (
   prefix: string,
@@ -174,7 +197,7 @@ export const createNewApiName = (actions: ActionDataState, pageId: string) => {
 };
 
 export const createNewJSFunctionName = (
-  jsActions: ActionDataState,
+  jsActions: JSCollectionData[],
   pageId: string,
 ) => {
   const pageJsFunctionNames = jsActions
@@ -211,17 +234,6 @@ export const convertToString = (value: any): string => {
   }
   if (_.isString(value)) return value;
   return value.toString();
-};
-
-const getEnvLogLevel = (configLevel: LogLevelDesc): LogLevelDesc => {
-  let logLevel = configLevel;
-  if (localStorage && localStorage.getItem) {
-    const localStorageLevel = localStorage.getItem(
-      "logLevelOverride",
-    ) as LogLevelDesc;
-    if (localStorageLevel) logLevel = localStorageLevel;
-  }
-  return logLevel;
 };
 
 export const getInitialsAndColorCode = (
@@ -287,29 +299,6 @@ export function hexToRgb(
       };
 }
 
-export function getQueryParams() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const keys = urlParams.keys();
-  let key = keys.next().value;
-  const queryParams: Record<string, string> = {};
-  while (key) {
-    queryParams[key] = urlParams.get(key) as string;
-    key = keys.next().value;
-  }
-  return queryParams;
-}
-
-export function convertObjectToQueryParams(object: any): string {
-  if (!_.isNil(object)) {
-    const paramArray: string[] = _.map(_.keys(object), (key) => {
-      return encodeURIComponent(key) + "=" + encodeURIComponent(object[key]);
-    });
-    return "?" + _.join(paramArray, "&");
-  } else {
-    return "";
-  }
-}
-
 export const retryPromise = (
   fn: () => Promise<any>,
   retriesLeft = 5,
@@ -349,7 +338,7 @@ export const isBlobUrl = (url: string) => {
  * @param type string file type
  * @returns string containing blob id and type
  */
-export const createBlobUrl = (data: Blob | string, type: string) => {
+export const createBlobUrl = (data: Blob | MediaSource, type: string) => {
   let url = URL.createObjectURL(data);
   url = url.replace(
     `${window.location.protocol}//${window.location.hostname}/`,
@@ -391,34 +380,6 @@ export const getCamelCaseString = (sourceString: string) => {
   return out;
 };
 
-/*
- * gets the page url
- *
- * Note: for edit mode, the page will have different url ( contains '/edit' at the end )
- *
- * @param page
- * @returns
- */
-export const getPageURL = (
-  page: Page,
-  appMode: APP_MODE | undefined,
-  currentApplicationDetails: CurrentApplicationData | undefined,
-) => {
-  if (appMode === APP_MODE.PUBLISHED) {
-    return trimQueryString(
-      getApplicationViewerPageURL({
-        applicationId: currentApplicationDetails?.id,
-        pageId: page.pageId,
-      }),
-    );
-  }
-
-  return getApplicationEditorPageURL(
-    currentApplicationDetails?.id,
-    page.pageId,
-  );
-};
-
 /**
  * Convert Base64 string to Blob
  * @param base64Data
@@ -449,3 +410,22 @@ export const base64ToBlob = (
   const blob = new Blob(byteArrays, { type: contentType });
   return blob;
 };
+
+// util function to detect current os is Mac
+export const isMacOs = () => {
+  return osName === "Mac OS";
+};
+
+/**
+ * checks if array of strings are equal regardless of order
+ * @param arr1
+ * @param arr2
+ * @returns
+ */
+export function areArraysEqual(arr1: string[], arr2: string[]) {
+  if (arr1.length !== arr2.length) return false;
+
+  if (arr1.sort().join(",") === arr2.sort().join(",")) return true;
+
+  return false;
+}

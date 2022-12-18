@@ -1,5 +1,8 @@
-import { createReducer } from "utils/AppsmithUtils";
-import { ReduxActionTypes, ReduxAction } from "constants/ReduxActionConstants";
+import { createReducer } from "utils/ReducerUtils";
+import {
+  ReduxActionTypes,
+  ReduxAction,
+} from "@appsmith/constants/ReduxActionConstants";
 import { Datasource } from "entities/Datasource";
 import _ from "lodash";
 
@@ -8,7 +11,8 @@ const initialState: DatasourcePaneReduxState = {
   actionRouteInfo: {},
   expandDatasourceId: "",
   newDatasource: "",
-  viewMode: {},
+  viewMode: true,
+  collapsibleState: {},
 };
 
 export interface DatasourcePaneReduxState {
@@ -21,7 +25,8 @@ export interface DatasourcePaneReduxState {
     applicationId: string;
   }>;
   newDatasource: string;
-  viewMode: Record<string, boolean>;
+  viewMode: boolean;
+  collapsibleState: Record<string, boolean>;
 }
 
 const datasourcePaneReducer = createReducer(initialState, {
@@ -43,6 +48,7 @@ const datasourcePaneReducer = createReducer(initialState, {
   ) => ({
     ...state,
     drafts: _.omit(state.drafts, action.payload.id),
+    newDatasource: "",
   }),
   [ReduxActionTypes.STORE_AS_DATASOURCE_UPDATE]: (
     state: DatasourcePaneReduxState,
@@ -71,6 +77,7 @@ const datasourcePaneReducer = createReducer(initialState, {
     return {
       ...state,
       newDatasource: action.payload.id,
+      expandDatasourceId: action.payload.id,
     };
   },
   [ReduxActionTypes.SAVE_DATASOURCE_NAME_SUCCESS]: (
@@ -93,14 +100,32 @@ const datasourcePaneReducer = createReducer(initialState, {
   },
   [ReduxActionTypes.SET_DATASOURCE_EDITOR_MODE]: (
     state: DatasourcePaneReduxState,
-    action: ReduxAction<{ id: string; viewMode: boolean }>,
+    action: ReduxAction<boolean>,
   ) => {
     return {
       ...state,
-      viewMode: {
-        ...state.viewMode,
-        [action.payload.id]: action.payload.viewMode,
+      viewMode: action.payload,
+    };
+  },
+  [ReduxActionTypes.SET_DATASOURCE_COLLAPSIBLE_STATE]: (
+    state: DatasourcePaneReduxState,
+    action: { payload: { key: string; isOpen: boolean } },
+  ) => {
+    return {
+      ...state,
+      collapsibleState: {
+        ...state.collapsibleState,
+        [action.payload.key]: action.payload.isOpen,
       },
+    };
+  },
+  [ReduxActionTypes.SET_ALL_DATASOURCE_COLLAPSIBLE_STATE]: (
+    state: DatasourcePaneReduxState,
+    action: { payload: { [key: string]: boolean } },
+  ) => {
+    return {
+      ...state,
+      collapsibleState: action.payload,
     };
   },
   [ReduxActionTypes.EXPAND_DATASOURCE_ENTITY]: (

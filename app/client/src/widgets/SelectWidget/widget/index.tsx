@@ -3,17 +3,128 @@ import BaseWidget, { WidgetProps, WidgetState } from "../../BaseWidget";
 import { WidgetType } from "constants/WidgetConstants";
 import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
 import SelectComponent from "../component";
-import _ from "lodash";
 import { DropdownOption } from "../constants";
-import { ValidationTypes } from "constants/WidgetValidation";
+import {
+  ValidationResponse,
+  ValidationTypes,
+} from "constants/WidgetValidation";
 import { EvaluationSubstitutionType } from "entities/DataTree/dataTreeFactory";
 import { MinimumPopupRows, GRID_DENSITY_MIGRATION_V1 } from "widgets/constants";
+import { LabelPosition } from "components/constants";
+import { Alignment } from "@blueprintjs/core";
+import { AutocompleteDataType } from "utils/autocomplete/CodemirrorTernService";
+import {
+  findIndex,
+  isArray,
+  isNil,
+  isNumber,
+  isString,
+  LoDashStatic,
+} from "lodash";
+import { isAutoHeightEnabledForWidget } from "widgets/WidgetUtils";
+import equal from "fast-deep-equal/es6";
+import derivedProperties from "./parseDerivedProperties";
+import { Stylesheet } from "entities/AppTheming";
+
+export function defaultOptionValueValidation(
+  value: unknown,
+  props: SelectWidgetProps,
+  _: LoDashStatic,
+): ValidationResponse {
+  let isValid;
+  let parsed;
+  let message = "";
+  const isServerSideFiltered = props.serverSideFiltering;
+  // TODO: validation of defaultOption is dependent on serverSideFiltering and options, this property should reValidated once the dependencies change
+  //this issue is been tracked here https://github.com/appsmithorg/appsmith/issues/15303
+  let options = props.options;
+  /*
+   * Function to check if the object has `label` and `value`
+   */
+  const hasLabelValue = (obj: any) => {
+    return (
+      _.isPlainObject(value) &&
+      obj.hasOwnProperty("label") &&
+      obj.hasOwnProperty("value") &&
+      _.isString(obj.label) &&
+      (_.isString(obj.value) || _.isFinite(obj.value))
+    );
+  };
+
+  /*
+   * When value is "{label: 'green', value: 'green'}"
+   */
+  if (typeof value === "string") {
+    try {
+      const parsedValue = JSON.parse(value);
+      if (_.isObject(parsedValue)) {
+        value = parsedValue;
+      }
+    } catch (e) {}
+  }
+
+  if (_.isString(value) || _.isFinite(value) || hasLabelValue(value)) {
+    /*
+     * When value is "", "green", 444, {label: "green", value: "green"}
+     */
+    isValid = true;
+    parsed = value;
+  } else {
+    isValid = false;
+    parsed = undefined;
+    message =
+      'value does not evaluate to type: string | number | { "label": "label1", "value": "value1" }';
+  }
+
+  if (isValid && !_.isNil(parsed) && parsed !== "") {
+    if (!Array.isArray(options) && typeof options === "string") {
+      try {
+        const parsedOptions = JSON.parse(options);
+        if (Array.isArray(parsedOptions)) {
+          options = parsedOptions;
+        } else {
+          options = [];
+        }
+      } catch (e) {
+        options = [];
+      }
+    }
+    const parsedValue = (parsed as any).hasOwnProperty("value")
+      ? (parsed as any).value
+      : parsed;
+    const valueIndex = _.findIndex(
+      options,
+      (option) => option.value === parsedValue,
+    );
+
+    if (valueIndex === -1) {
+      if (!isServerSideFiltered) {
+        isValid = false;
+        message = `Default value is missing in options. Please update the value.`;
+      } else {
+        if (!hasLabelValue(parsed)) {
+          isValid = false;
+          message = `Default value is missing in options. Please use {label : <string | num>, value : < string | num>} format to show default for server side data.`;
+        }
+      }
+    }
+  }
+  return {
+    isValid,
+    parsed,
+    messages: [message],
+  };
+}
 
 class SelectWidget extends BaseWidget<SelectWidgetProps, WidgetState> {
-  static getPropertyPaneConfig() {
+  constructor(props: SelectWidgetProps) {
+    super(props);
+  }
+
+  static getPropertyPaneContentConfig() {
     return [
       {
-        sectionName: "General",
+        sectionName: "Data",
         children: [
           {
             helpText:
@@ -21,7 +132,7 @@ class SelectWidget extends BaseWidget<SelectWidgetProps, WidgetState> {
             propertyName: "options",
             label: "Options",
             controlType: "INPUT_TEXT",
-            placeholderText: '[{ "label": "Option1", "value": "Option2" }]',
+            placeholderText: '[{ "label": "label1", "value": "value1" }]',
             isBindProperty: true,
             isTriggerProperty: false,
             validation: {
@@ -60,41 +171,159 @@ class SelectWidget extends BaseWidget<SelectWidgetProps, WidgetState> {
           {
             helpText: "Selects the option with value by default",
             propertyName: "defaultOptionValue",
-            label: "Default Option",
-            controlType: "INPUT_TEXT",
-            placeholderText: '{ "label": "Option1", "value": "Option2" }',
+            label: "Default Selected Value",
+            controlType: "SELECT_DEFAULT_VALUE_CONTROL",
+            placeholderText: '{ "label": "label1", "value": "value1" }',
             isBindProperty: true,
             isTriggerProperty: false,
             validation: {
-              type: ValidationTypes.OBJECT,
+              type: ValidationTypes.FUNCTION,
               params: {
-                allowedKeys: [
-                  {
-                    name: "label",
-                    type: ValidationTypes.TEXT,
-                    params: {
-                      default: "",
-                      requiredKey: true,
-                    },
-                  },
-                  {
-                    name: "value",
-                    type: ValidationTypes.TEXT,
-                    params: {
-                      default: "",
-                      requiredKey: true,
-                    },
-                  },
-                ],
+                fn: defaultOptionValueValidation,
+                expected: {
+                  type: 'value1 or { "label": "label1", "value": "value1" }',
+                  example: `value1 | { "label": "label1", "value": "value1" }`,
+                  autocompleteDataType: AutocompleteDataType.STRING,
+                },
               },
             },
+            dependencies: ["serverSideFiltering", "options"],
+          },
+        ],
+      },
+      {
+        sectionName: "Label",
+        children: [
+          {
+            helpText: "Sets the label text of the widget",
+            propertyName: "labelText",
+            label: "Text",
+            controlType: "INPUT_TEXT",
+            placeholderText: "Enter label text",
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
           },
           {
-            helpText: "Sets a Label Text",
-            propertyName: "labelText",
-            label: "Label Text",
+            helpText: "Sets the label position of the widget",
+            propertyName: "labelPosition",
+            label: "Position",
+            controlType: "ICON_TABS",
+            fullWidth: true,
+            options: [
+              { label: "Left", value: LabelPosition.Left },
+              { label: "Top", value: LabelPosition.Top },
+              { label: "Auto", value: LabelPosition.Auto },
+            ],
+            defaultValue: LabelPosition.Top,
+            isBindProperty: false,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            helpText: "Sets the label alignment of the widget",
+            propertyName: "labelAlignment",
+            label: "Alignment",
+            controlType: "LABEL_ALIGNMENT_OPTIONS",
+            options: [
+              {
+                icon: "LEFT_ALIGN",
+                value: Alignment.LEFT,
+              },
+              {
+                icon: "RIGHT_ALIGN",
+                value: Alignment.RIGHT,
+              },
+            ],
+            isBindProperty: false,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+            hidden: (props: SelectWidgetProps) =>
+              props.labelPosition !== LabelPosition.Left,
+            dependencies: ["labelPosition"],
+          },
+          {
+            helpText:
+              "Sets the label width of the widget as the number of columns",
+            propertyName: "labelWidth",
+            label: "Width (in columns)",
+            controlType: "NUMERIC_INPUT",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            min: 0,
+            validation: {
+              type: ValidationTypes.NUMBER,
+              params: {
+                natural: true,
+              },
+            },
+            hidden: (props: SelectWidgetProps) =>
+              props.labelPosition !== LabelPosition.Left,
+            dependencies: ["labelPosition"],
+          },
+        ],
+      },
+      {
+        sectionName: "Search & Filters",
+        children: [
+          {
+            propertyName: "isFilterable",
+            label: "Allow Searching",
+            helpText: "Makes the dropdown list filterable",
+            controlType: "SWITCH",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.BOOLEAN },
+          },
+          {
+            helpText: "Enables server side filtering of the data",
+            propertyName: "serverSideFiltering",
+            label: "Server Side Filtering",
+            controlType: "SWITCH",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.BOOLEAN },
+          },
+          {
+            helpText: "Trigger an action on change of filterText",
+            hidden: (props: SelectWidgetProps) => !props.serverSideFiltering,
+            dependencies: ["serverSideFiltering"],
+            propertyName: "onFilterUpdate",
+            label: "onFilterUpdate",
+            controlType: "ACTION_SELECTOR",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: true,
+          },
+        ],
+      },
+      {
+        sectionName: "Validations",
+        children: [
+          {
+            propertyName: "isRequired",
+            label: "Required",
+            helpText: "Makes input to the widget mandatory",
+            controlType: "SWITCH",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.BOOLEAN },
+          },
+        ],
+      },
+      {
+        sectionName: "General",
+        children: [
+          {
+            helpText: "Show help text or details about current selection",
+            propertyName: "labelTooltip",
+            label: "Tooltip",
             controlType: "INPUT_TEXT",
-            placeholderText: "Enter Label text",
+            placeholderText: "Add tooltip text here",
             isBindProperty: true,
             isTriggerProperty: false,
             validation: { type: ValidationTypes.TEXT },
@@ -108,16 +337,6 @@ class SelectWidget extends BaseWidget<SelectWidgetProps, WidgetState> {
             isBindProperty: true,
             isTriggerProperty: false,
             validation: { type: ValidationTypes.TEXT },
-          },
-          {
-            propertyName: "isRequired",
-            label: "Required",
-            helpText: "Makes input to the widget mandatory",
-            controlType: "SWITCH",
-            isJSConvertible: true,
-            isBindProperty: true,
-            isTriggerProperty: false,
-            validation: { type: ValidationTypes.BOOLEAN },
           },
           {
             helpText: "Controls the visibility of the widget",
@@ -150,34 +369,52 @@ class SelectWidget extends BaseWidget<SelectWidgetProps, WidgetState> {
             isTriggerProperty: false,
             validation: { type: ValidationTypes.BOOLEAN },
           },
-          {
-            propertyName: "isFilterable",
-            label: "Filterable",
-            helpText: "Makes the dropdown list filterable",
-            controlType: "SWITCH",
-            isJSConvertible: true,
-            isBindProperty: true,
-            isTriggerProperty: false,
-            validation: { type: ValidationTypes.BOOLEAN },
-          },
-          {
-            helpText: "Enables server side filtering of the data",
-            propertyName: "serverSideFiltering",
-            label: "Server Side Filtering",
-            controlType: "SWITCH",
-            isJSConvertible: true,
-            isBindProperty: true,
-            isTriggerProperty: false,
-            validation: { type: ValidationTypes.BOOLEAN },
-          },
         ],
       },
       {
-        sectionName: "Styles",
+        sectionName: "Events",
+        children: [
+          {
+            helpText: "Triggers an action when a user selects an option",
+            propertyName: "onOptionChange",
+            label: "onOptionChange",
+            controlType: "ACTION_SELECTOR",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: true,
+          },
+          {
+            helpText: "Triggers an action when the dropdown opens",
+            propertyName: "onDropdownOpen",
+            label: "onDropdownOpen",
+            controlType: "ACTION_SELECTOR",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: true,
+          },
+          {
+            helpText: "Triggers an action when the dropdown closes",
+            propertyName: "onDropdownClose",
+            label: "onDropdownClose",
+            controlType: "ACTION_SELECTOR",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: true,
+          },
+        ],
+      },
+    ];
+  }
+
+  static getPropertyPaneStyleConfig() {
+    return [
+      {
+        sectionName: "Label Styles",
         children: [
           {
             propertyName: "labelTextColor",
-            label: "Label Text Color",
+            label: "Font Color",
+            helpText: "Control the color of the label associated",
             controlType: "COLOR_PICKER",
             isJSConvertible: true,
             isBindProperty: true,
@@ -186,47 +423,51 @@ class SelectWidget extends BaseWidget<SelectWidgetProps, WidgetState> {
           },
           {
             propertyName: "labelTextSize",
-            label: "Label Text Size",
+            label: "Font Size",
+            helpText: "Control the font size of the label associated",
             controlType: "DROP_DOWN",
-            defaultValue: "PARAGRAPH",
+            defaultValue: "0.875rem",
             options: [
               {
-                label: "Heading 1",
-                value: "HEADING1",
-                subText: "24px",
-                icon: "HEADING_ONE",
+                label: "S",
+                value: "0.875rem",
+                subText: "0.875rem",
               },
               {
-                label: "Heading 2",
-                value: "HEADING2",
-                subText: "18px",
-                icon: "HEADING_TWO",
+                label: "M",
+                value: "1rem",
+                subText: "1rem",
               },
               {
-                label: "Heading 3",
-                value: "HEADING3",
-                subText: "16px",
-                icon: "HEADING_THREE",
+                label: "L",
+                value: "1.25rem",
+                subText: "1.25rem",
               },
               {
-                label: "Paragraph",
-                value: "PARAGRAPH",
-                subText: "14px",
-                icon: "PARAGRAPH",
+                label: "XL",
+                value: "1.875rem",
+                subText: "1.875rem",
               },
               {
-                label: "Paragraph 2",
-                value: "PARAGRAPH2",
-                subText: "12px",
-                icon: "PARAGRAPH_TWO",
+                label: "XXL",
+                value: "3rem",
+                subText: "3rem",
+              },
+              {
+                label: "3XL",
+                value: "3.75rem",
+                subText: "3.75rem",
               },
             ],
-            isBindProperty: false,
+            isJSConvertible: true,
+            isBindProperty: true,
             isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
           },
           {
             propertyName: "labelStyle",
-            label: "Label Font Style",
+            label: "Emphasis",
+            helpText: "Control if the label should be bold or italics",
             controlType: "BUTTON_TABS",
             options: [
               {
@@ -246,86 +487,117 @@ class SelectWidget extends BaseWidget<SelectWidgetProps, WidgetState> {
         ],
       },
       {
-        sectionName: "Actions",
+        sectionName: "Colors",
         children: [
           {
-            helpText: "Triggers an action when a user selects an option",
-            propertyName: "onOptionChange",
-            label: "onOptionChange",
-            controlType: "ACTION_SELECTOR",
+            propertyName: "accentColor",
+            label: "Accent Color",
+            controlType: "COLOR_PICKER",
             isJSConvertible: true,
             isBindProperty: true,
-            isTriggerProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+            invisible: true,
+          },
+        ],
+      },
+      {
+        sectionName: "Border and Shadow",
+        children: [
+          {
+            propertyName: "borderRadius",
+            label: "Border Radius",
+            helpText:
+              "Rounds the corners of the icon button's outer border edge",
+            controlType: "BORDER_RADIUS_OPTIONS",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
           },
           {
-            helpText: "Trigger an action on change of filterText",
-            hidden: (props: SelectWidgetProps) => !props.serverSideFiltering,
-            dependencies: ["serverSideFiltering"],
-            propertyName: "onFilterUpdate",
-            label: "onFilterUpdate",
-            controlType: "ACTION_SELECTOR",
+            propertyName: "boxShadow",
+            label: "Box Shadow",
+            helpText:
+              "Enables you to cast a drop shadow from the frame of the widget",
+            controlType: "BOX_SHADOW_OPTIONS",
             isJSConvertible: true,
             isBindProperty: true,
-            isTriggerProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
           },
         ],
       },
     ];
   }
 
-  static getDerivedPropertiesMap() {
+  static getStylesheetConfig(): Stylesheet {
     return {
-      isValid: `{{this.isRequired  ? !!this.selectedOptionValue || this.selectedOptionValue === 0 : true}}`,
-      selectedOptionLabel: `{{ this.optionValue.label ?? this.optionValue.value }}`,
-      selectedOptionValue: `{{ this.optionValue.value }}`,
+      accentColor: "{{appsmith.theme.colors.primaryColor}}",
+      borderRadius: "{{appsmith.theme.borderRadius.appBorderRadius}}",
+      boxShadow: "none",
     };
   }
 
   static getDefaultPropertiesMap(): Record<string, string> {
     return {
-      defaultValue: "defaultOptionValue",
-      optionValue: "defaultOptionValue",
+      value: "defaultOptionValue",
+      label: "defaultOptionValue",
+      filterText: "",
     };
   }
 
   static getMetaPropertiesMap(): Record<string, any> {
     return {
-      defaultValue: undefined,
-      optionValue: undefined,
+      value: undefined,
+      label: undefined,
+      filterText: "",
+      isDirty: false,
+    };
+  }
+
+  // https://github.com/appsmithorg/appsmith/issues/13664#issuecomment-1120814337
+  static getDerivedPropertiesMap() {
+    return {
+      isValid: `{{(()=>{${derivedProperties.getIsValid}})()}}`,
+      selectedOptionValue: `{{(()=>{${derivedProperties.getSelectedOptionValue}})()}}`,
+
+      selectedOptionLabel: `{{(()=>{${derivedProperties.getSelectedOptionLabel}})()}}`,
     };
   }
 
   componentDidMount() {
-    this.changeSelectedOption();
+    super.componentDidMount();
   }
+
   componentDidUpdate(prevProps: SelectWidgetProps): void {
-    // removing selectedOptionValue if defaultValueChanges
+    // Reset isDirty to false if defaultOptionValue changes
     if (
-      prevProps.defaultOptionValue?.value !==
-        this.props.defaultOptionValue?.value ||
-      prevProps.option !== this.props.option
+      !equal(this.props.defaultOptionValue, prevProps.defaultOptionValue) &&
+      this.props.isDirty
     ) {
-      this.changeSelectedOption();
+      this.props.updateWidgetMetaProperty("isDirty", false);
     }
   }
 
-  changeSelectedOption = () => {
-    this.props.updateWidgetMetaProperty("optionValue", this.props.optionValue);
-  };
+  isStringOrNumber = (value: any): value is string | number =>
+    isString(value) || isNumber(value);
 
   getPageView() {
-    const options = _.isArray(this.props.options) ? this.props.options : [];
+    const options = isArray(this.props.options) ? this.props.options : [];
     const isInvalid =
       "isValid" in this.props && !this.props.isValid && !!this.props.isDirty;
     const dropDownWidth = MinimumPopupRows * this.props.parentColumnSpace;
 
-    const selectedIndex = _.findIndex(this.props.options, {
+    const selectedIndex = findIndex(this.props.options, {
       value: this.props.selectedOptionValue,
     });
-
     const { componentHeight, componentWidth } = this.getComponentDimensions();
     return (
       <SelectComponent
+        accentColor={this.props.accentColor}
+        borderRadius={this.props.borderRadius}
+        boxShadow={this.props.boxShadow}
         compactMode={
           !(
             (this.props.bottomRow - this.props.topRow) /
@@ -338,21 +610,29 @@ class SelectWidget extends BaseWidget<SelectWidgetProps, WidgetState> {
         filterText={this.props.filterText}
         hasError={isInvalid}
         height={componentHeight}
+        isDynamicHeightEnabled={isAutoHeightEnabledForWidget(this.props)}
         isFilterable={this.props.isFilterable}
         isLoading={this.props.isLoading}
         isValid={this.props.isValid}
-        label={this.props.optionValue?.label}
+        label={this.props.selectedOptionLabel}
+        labelAlignment={this.props.labelAlignment}
+        labelPosition={this.props.labelPosition}
         labelStyle={this.props.labelStyle}
         labelText={this.props.labelText}
         labelTextColor={this.props.labelTextColor}
         labelTextSize={this.props.labelTextSize}
+        labelTooltip={this.props.labelTooltip}
+        labelWidth={this.getLabelWidth()}
+        onDropdownClose={this.onDropdownClose}
+        onDropdownOpen={this.onDropdownOpen}
         onFilterChange={this.onFilterChange}
         onOptionSelected={this.onOptionSelected}
         options={options}
         placeholder={this.props.placeholderText}
+        resetFilterTextOnClose={!this.props.serverSideFiltering}
         selectedIndex={selectedIndex > -1 ? selectedIndex : undefined}
         serverSideFiltering={this.props.serverSideFiltering}
-        value={this.props.optionValue?.value}
+        value={this.props.selectedOptionValue}
         widgetId={this.props.widgetId}
         width={componentWidth}
       />
@@ -362,36 +642,72 @@ class SelectWidget extends BaseWidget<SelectWidgetProps, WidgetState> {
   onOptionSelected = (selectedOption: DropdownOption) => {
     let isChanged = true;
 
-    if (!this.props.isDirty) {
-      this.props.updateWidgetMetaProperty("isDirty", true);
-    }
-
     // Check if the value has changed. If no option
     // selected till now, there is a change
-    if (this.props.selectedOptionValue) {
-      isChanged = !(this.props.selectedOptionValue === selectedOption.value);
+    if (!isNil(this.props.selectedOptionValue)) {
+      isChanged = this.props.selectedOptionValue !== selectedOption.value;
     }
     if (isChanged) {
-      this.props.updateWidgetMetaProperty("optionValue", selectedOption, {
+      if (!this.props.isDirty) {
+        this.props.updateWidgetMetaProperty("isDirty", true);
+      }
+
+      this.props.updateWidgetMetaProperty("label", selectedOption.label ?? "");
+
+      this.props.updateWidgetMetaProperty("value", selectedOption.value ?? "", {
         triggerPropertyName: "onOptionChange",
-        dynamicString: this.props.onOptionChange as string,
+        dynamicString: this.props.onOptionChange,
         event: {
           type: EventType.ON_OPTION_CHANGE,
         },
       });
+      if (!this.props.isDirty) {
+        this.props.updateWidgetMetaProperty("isDirty", true);
+      }
+    }
+
+    // When Label changes but value doesnt change, Applies to serverside Filtering
+    if (!isChanged && this.props.selectedOptionLabel !== selectedOption.label) {
+      this.props.updateWidgetMetaProperty("label", selectedOption.label ?? "");
     }
   };
 
   onFilterChange = (value: string) => {
     this.props.updateWidgetMetaProperty("filterText", value);
 
-    super.executeAction({
-      triggerPropertyName: "onFilterUpdate",
-      dynamicString: this.props.onFilterUpdate,
-      event: {
-        type: EventType.ON_FILTER_UPDATE,
-      },
-    });
+    if (this.props.onFilterUpdate && this.props.serverSideFiltering) {
+      super.executeAction({
+        triggerPropertyName: "onFilterUpdate",
+        dynamicString: this.props.onFilterUpdate,
+        event: {
+          type: EventType.ON_FILTER_UPDATE,
+        },
+      });
+    }
+  };
+
+  onDropdownOpen = () => {
+    if (this.props.onDropdownOpen) {
+      super.executeAction({
+        triggerPropertyName: "onDropdownOpen",
+        dynamicString: this.props.onDropdownOpen,
+        event: {
+          type: EventType.ON_DROPDOWN_OPEN,
+        },
+      });
+    }
+  };
+
+  onDropdownClose = () => {
+    if (this.props.onDropdownClose) {
+      super.executeAction({
+        triggerPropertyName: "onDropdownClose",
+        dynamicString: this.props.onDropdownClose,
+        event: {
+          type: EventType.ON_DROPDOWN_CLOSE,
+        },
+      });
+    }
   };
 
   static getWidgetType(): WidgetType {
@@ -401,20 +717,25 @@ class SelectWidget extends BaseWidget<SelectWidgetProps, WidgetState> {
 
 export interface SelectWidgetProps extends WidgetProps {
   placeholderText?: string;
-  label?: string;
+  labelText: string;
+  labelPosition?: LabelPosition;
+  labelAlignment?: Alignment;
+  labelWidth?: number;
   selectedIndex?: number;
-  selectedOption: DropdownOption;
   options?: DropdownOption[];
   onOptionChange?: string;
-  defaultOptionValue?: { label?: string; value?: string };
-  value?: string;
+  onDropdownOpen?: string;
+  onDropdownClose?: string;
+  defaultOptionValue?: any;
+  value?: any;
+  label?: any;
   isRequired: boolean;
   isFilterable: boolean;
-  defaultValue: string;
   selectedOptionLabel: string;
   serverSideFiltering: boolean;
   onFilterUpdate: string;
   isDirty?: boolean;
+  filterText: string;
 }
 
 export default SelectWidget;

@@ -12,17 +12,22 @@ import { getBorderCSSShorthand } from "constants/DefaultTheme";
 import { MarkerProps } from "../constants";
 import { DerivedPropertiesMap } from "utils/WidgetFactory";
 import { EvaluationSubstitutionType } from "entities/DataTree/dataTreeFactory";
+import { Stylesheet } from "entities/AppTheming";
 
 const { google } = getAppsmithConfigs();
 
-const DisabledContainer = styled.div`
+const DisabledContainer = styled.div<{
+  borderRadius: string;
+  boxShadow?: string;
+}>`
   background-color: white;
   height: 100%;
   text-align: center;
   display: flex;
   flex-direction: column;
+  border-radius: ${({ borderRadius }) => borderRadius};
+  box-shadow: ${({ boxShadow }) => boxShadow} !important;
   border: ${(props) => getBorderCSSShorthand(props.theme.borders[2])};
-  border-radius: 0;
   h1 {
     margin-top: 15%;
     margin-bottom: 10%;
@@ -41,14 +46,16 @@ type Center = {
   [x: string]: any;
 };
 class MapWidget extends BaseWidget<MapWidgetProps, WidgetState> {
-  static getPropertyPaneConfig() {
+  static getPropertyPaneContentConfig() {
     return [
       {
-        sectionName: "General",
+        sectionName: "Data",
         children: [
           {
             propertyName: "mapCenter",
             label: "Initial location",
+            helpText:
+              "Default location for the map. Search for a location directly in the field.",
             isJSConvertible: true,
             controlType: "LOCATION_SEARCH",
             isBindProperty: true,
@@ -134,36 +141,17 @@ class MapWidget extends BaseWidget<MapWidgetProps, WidgetState> {
             evaluationSubstitutionType:
               EvaluationSubstitutionType.SMART_SUBSTITUTE,
           },
+        ],
+      },
+      {
+        sectionName: "General",
+        children: [
           {
-            propertyName: "isClickedMarkerCentered",
-            label: "Map & Marker centering",
-            helpText:
-              "Controls whether the clicked marker is centered on the map",
-            controlType: "SWITCH",
-            isBindProperty: false,
-            isTriggerProperty: false,
-          },
-          {
-            propertyName: "enableSearch",
-            label: "Enable search location",
-            helpText: "Allows a user to search for a location",
-            controlType: "SWITCH",
-            isBindProperty: false,
-            isTriggerProperty: false,
-          },
-          {
-            propertyName: "enablePickLocation",
-            label: "Enable pick location",
-            helpText: "Allows a user to pick their location",
-            controlType: "SWITCH",
-            isBindProperty: false,
-            isTriggerProperty: false,
-          },
-          {
-            propertyName: "enableCreateMarker",
-            label: "Create new marker",
-            helpText: "Allows users to mark locations on the map",
-            controlType: "SWITCH",
+            propertyName: "zoomLevel",
+            label: "Zoom Level",
+            controlType: "STEP",
+            helpText: "Changes the default zoom of the map",
+            stepType: "ZOOM_PERCENTAGE",
             isBindProperty: false,
             isTriggerProperty: false,
           },
@@ -189,13 +177,56 @@ class MapWidget extends BaseWidget<MapWidgetProps, WidgetState> {
             validation: { type: ValidationTypes.BOOLEAN },
           },
           {
-            propertyName: "zoomLevel",
-            label: "Zoom Level",
-            controlType: "STEP",
-            helpText: "Changes the default zoom of the map",
-            stepType: "ZOOM_PERCENTAGE",
+            propertyName: "enablePickLocation",
+            label: "Enable pick location",
+            helpText: "Allows a user to pick their location",
+            controlType: "SWITCH",
             isBindProperty: false,
             isTriggerProperty: false,
+          },
+          {
+            propertyName: "isClickedMarkerCentered",
+            label: "Map & Marker centering",
+            helpText:
+              "Controls whether the clicked marker is centered on the map",
+            controlType: "SWITCH",
+            isBindProperty: false,
+            isTriggerProperty: false,
+          },
+          {
+            propertyName: "enableSearch",
+            label: "Enable search location",
+            helpText: "Allows a user to search for a location",
+            controlType: "SWITCH",
+            isBindProperty: false,
+            isTriggerProperty: false,
+          },
+        ],
+      },
+      {
+        sectionName: "Create Marker",
+        children: [
+          {
+            propertyName: "enableCreateMarker",
+            label: "Create new marker",
+            helpText: "Allows users to mark locations on the map",
+            controlType: "SWITCH",
+            isBindProperty: false,
+            isTriggerProperty: false,
+          },
+          {
+            propertyName: "onCreateMarker",
+            label: "onCreateMarker",
+            helpText:
+              "When create new marker is enabled, this event triggers upon successful marker creation",
+            controlType: "ACTION_SELECTOR",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: true,
+            hidden: (props: MapWidgetProps) => {
+              return !props.enableCreateMarker;
+            },
+            dependencies: ["enableCreateMarker"],
           },
         ],
       },
@@ -205,14 +236,7 @@ class MapWidget extends BaseWidget<MapWidgetProps, WidgetState> {
           {
             propertyName: "onMarkerClick",
             label: "onMarkerClick",
-            controlType: "ACTION_SELECTOR",
-            isJSConvertible: true,
-            isBindProperty: true,
-            isTriggerProperty: true,
-          },
-          {
-            propertyName: "onCreateMarker",
-            label: "onCreateMarker",
+            helpText: "Triggers an action when the user clicks on the marker",
             controlType: "ACTION_SELECTOR",
             isJSConvertible: true,
             isBindProperty: true,
@@ -223,6 +247,38 @@ class MapWidget extends BaseWidget<MapWidgetProps, WidgetState> {
     ];
   }
 
+  static getPropertyPaneStyleConfig() {
+    return [
+      {
+        sectionName: "Border and Shadow",
+        children: [
+          {
+            propertyName: "borderRadius",
+            label: "Border Radius",
+            helpText:
+              "Rounds the corners of the icon button's outer border edge",
+            controlType: "BORDER_RADIUS_OPTIONS",
+
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            propertyName: "boxShadow",
+            label: "Box Shadow",
+            helpText:
+              "Enables you to cast a drop shadow from the frame of the widget",
+            controlType: "BOX_SHADOW_OPTIONS",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+        ],
+      },
+    ];
+  }
   static getDefaultPropertiesMap(): Record<string, any> {
     return {
       markers: "defaultMarkers",
@@ -241,8 +297,15 @@ class MapWidget extends BaseWidget<MapWidgetProps, WidgetState> {
     return {};
   }
 
-  updateCenter = (lat: number, long: number) => {
-    this.props.updateWidgetMetaProperty("center", { lat, long });
+  static getStylesheetConfig(): Stylesheet {
+    return {
+      borderRadius: "{{appsmith.theme.borderRadius.appBorderRadius}}",
+      boxShadow: "{{appsmith.theme.boxShadow.appBoxShadow}}",
+    };
+  }
+
+  updateCenter = (lat: number, long: number, title?: string) => {
+    this.props.updateWidgetMetaProperty("center", { lat, long, title });
   };
 
   updateMarker = (lat: number, long: number, index: number) => {
@@ -340,7 +403,10 @@ class MapWidget extends BaseWidget<MapWidgetProps, WidgetState> {
     return (
       <>
         {!google.enabled && (
-          <DisabledContainer>
+          <DisabledContainer
+            borderRadius={this.props.borderRadius}
+            boxShadow={this.props.boxShadow}
+          >
             <h1>{"Map Widget disabled"}</h1>
             <p>{"Map widget requires a Google Maps API Key"}</p>
             <p>
@@ -360,6 +426,8 @@ class MapWidget extends BaseWidget<MapWidgetProps, WidgetState> {
           <MapComponent
             allowZoom={this.props.allowZoom}
             apiKey={google.apiKey}
+            borderRadius={this.props.borderRadius}
+            boxShadow={this.props.boxShadow}
             center={this.getCenter()}
             clickedMarkerCentered={this.props.isClickedMarkerCentered}
             enableCreateMarker={this.props.enableCreateMarker}
@@ -414,6 +482,8 @@ export interface MapWidgetProps extends WidgetProps {
   };
   onMarkerClick?: string;
   onCreateMarker?: string;
+  borderRadius: string;
+  boxShadow?: string;
 }
 
 export default MapWidget;

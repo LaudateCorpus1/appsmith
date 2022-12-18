@@ -4,7 +4,6 @@ import tinycolor from "tinycolor2";
 import { invisible } from "constants/DefaultTheme";
 import { Color } from "constants/Colors";
 import { generateClassName, getCanvasClassName } from "utils/generators";
-import { useCanvasMinHeightUpdateHook } from "utils/hooks/useCanvasMinHeightUpdateHook";
 import WidgetStyleContainer, {
   WidgetStyleContainerProps,
 } from "components/designSystems/appsmith/WidgetStyleContainer";
@@ -29,6 +28,8 @@ const StyledContainerComponent = styled.div<
   ${(props) => (!props.isVisible ? invisible : "")};
   box-shadow: ${(props) =>
     props.selected ? "inset 0px 0px 0px 3px rgba(59,130,246,0.5)" : "none"};
+  border-radius: ${({ borderRadius }) => borderRadius};
+
   ${(props) =>
     props.shouldScrollContents === true
       ? scrollContents
@@ -49,7 +50,7 @@ const StyledContainerComponent = styled.div<
         : props.backgroundColor;
     }};
   }
-}`;
+`;
 
 function ContainerComponentWrapper(props: ContainerComponentProps) {
   const containerStyle = props.containerStyle || "card";
@@ -84,7 +85,6 @@ function ContainerComponentWrapper(props: ContainerComponentProps) {
 }
 
 function ContainerComponent(props: ContainerComponentProps) {
-  useCanvasMinHeightUpdateHook(props.widgetId, props.minHeight);
   return props.widgetId === MAIN_CONTAINER_WIDGET_ID ? (
     <ContainerComponentWrapper {...props} />
   ) : (
@@ -92,11 +92,11 @@ function ContainerComponent(props: ContainerComponentProps) {
       {...pick(props, [
         "widgetId",
         "containerStyle",
+        "backgroundColor",
         "borderColor",
         "borderWidth",
         "borderRadius",
         "boxShadow",
-        "boxShadowColor",
       ])}
     >
       <ContainerComponentWrapper {...props} />

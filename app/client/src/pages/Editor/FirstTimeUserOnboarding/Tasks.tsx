@@ -1,6 +1,6 @@
 import { toggleInOnboardingWidgetSelection } from "actions/onboardingActions";
 import { forceOpenWidgetPanel } from "actions/widgetSidebarActions";
-import Button from "components/ads/Button";
+import { Button } from "design-system";
 import {
   ONBOARDING_TASK_DATASOURCE_BODY,
   ONBOARDING_TASK_DATASOURCE_HEADER,
@@ -18,11 +18,11 @@ import {
   ONBOARDING_TASK_FOOTER,
   createMessage,
 } from "@appsmith/constants/messages";
-import { ReduxActionTypes } from "constants/ReduxActionConstants";
-import { INTEGRATION_EDITOR_URL, INTEGRATION_TABS } from "constants/routes";
+import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import { INTEGRATION_TABS } from "constants/routes";
 import { ASSETS_CDN_URL } from "constants/ThirdPartyConstants";
 import React from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 
 import {
   getCurrentApplicationId,
@@ -34,11 +34,11 @@ import {
   getPageActions,
 } from "selectors/entitiesSelector";
 import { getFirstTimeUserOnboardingModal } from "selectors/onboardingSelectors";
-import { useSelector } from "store";
 import styled from "styled-components";
 import AnalyticsUtil from "utils/AnalyticsUtil";
 import history from "utils/history";
 import IntroductionModal from "./IntroductionModal";
+import { integrationEditorURL } from "RouteBuilder";
 
 const Wrapper = styled.div`
   width: 100%;
@@ -130,11 +130,10 @@ export default function OnboardingTasks() {
                 from: "CANVAS",
               });
               history.push(
-                INTEGRATION_EDITOR_URL(
-                  applicationId,
+                integrationEditorURL({
                   pageId,
-                  INTEGRATION_TABS.NEW,
-                ),
+                  selectedTab: INTEGRATION_TABS.NEW,
+                }),
               );
             }}
             tag="button"
@@ -183,11 +182,10 @@ export default function OnboardingTasks() {
                 from: "CANVAS",
               });
               history.push(
-                INTEGRATION_EDITOR_URL(
-                  applicationId,
+                integrationEditorURL({
                   pageId,
-                  INTEGRATION_TABS.ACTIVE,
-                ),
+                  selectedTab: INTEGRATION_TABS.ACTIVE,
+                }),
               );
             }}
             tag="button"

@@ -12,29 +12,24 @@ import PerformanceTracker, {
 } from "utils/PerformanceTracker";
 import AnalyticsUtil from "utils/AnalyticsUtil";
 import CanvasContainer from "./CanvasContainer";
-import { flashElementsById } from "utils/helpers";
+import { quickScrollToWidget } from "utils/helpers";
 import Debugger from "components/editorComponents/Debugger";
 import OnboardingTasks from "../FirstTimeUserOnboarding/Tasks";
 import CrudInfoModal from "../GeneratePage/components/CrudInfoModal";
 import { useWidgetSelection } from "utils/hooks/useWidgetSelection";
-import { useDynamicAppLayout } from "utils/hooks/useDynamicAppLayout";
 import { getCurrentApplication } from "selectors/applicationSelectors";
 import { setCanvasSelectionFromEditor } from "actions/canvasSelectionActions";
 import { closePropertyPane, closeTableFilterPane } from "actions/widgetActions";
-import {
-  getIsOnboardingTasksView,
-  getIsOnboardingWidgetSelection,
-} from "selectors/entitiesSelector";
 import { useAllowEditorDragToSelect } from "utils/hooks/useAllowEditorDragToSelect";
 import {
-  getIsFirstTimeUserOnboardingEnabled,
+  getIsOnboardingTasksView,
   inGuidedTour,
 } from "selectors/onboardingSelectors";
 import EditorContextProvider from "components/editorComponents/EditorContextProvider";
-import { PropertyPaneSidebar } from "components/editorComponents/PropertyPaneSidebar";
-import { updateExplorerWidthAction } from "actions/explorerActions";
-import { DEFAULT_PROPERTY_PANE_WIDTH } from "constants/AppConstants";
 import Guide from "../GuidedTour/Guide";
+import PropertyPaneContainer from "./PropertyPaneContainer";
+import CanvasTopSection from "./EmptyCanvasSection";
+import { useAutoHeightUIState } from "utils/hooks/autoHeightUIHooks";
 
 /* eslint-disable react/display-name */
 function WidgetsEditor() {
@@ -45,14 +40,7 @@ function WidgetsEditor() {
   const currentApp = useSelector(getCurrentApplication);
   const isFetchingPage = useSelector(getIsFetchingPage);
   const showOnboardingTasks = useSelector(getIsOnboardingTasksView);
-  const enableFirstTimeUserOnboarding = useSelector(
-    getIsFirstTimeUserOnboardingEnabled,
-  );
-  const isOnboardingWidgetSelection = useSelector(
-    getIsOnboardingWidgetSelection,
-  );
   const guidedTourEnabled = useSelector(inGuidedTour);
-  useDynamicAppLayout();
   useEffect(() => {
     PerformanceTracker.stopTracking(PerformanceTransactionName.CLOSE_SIDE_PANE);
   });
@@ -71,25 +59,37 @@ function WidgetsEditor() {
 
   // navigate to widget
   useEffect(() => {
-    if (!isFetchingPage && window.location.hash.length > 0) {
-      const widgetIdFromURLHash = window.location.hash.substr(1);
-      flashElementsById(widgetIdFromURLHash);
+    if (
+      !isFetchingPage &&
+      window.location.hash.length > 0 &&
+      !guidedTourEnabled
+    ) {
+      const widgetIdFromURLHash = window.location.hash.slice(1);
+      quickScrollToWidget(widgetIdFromURLHash);
       if (document.getElementById(widgetIdFromURLHash))
         selectWidget(widgetIdFromURLHash);
     }
-  }, [isFetchingPage, selectWidget]);
+  }, [isFetchingPage, selectWidget, guidedTourEnabled]);
 
   const allowDragToSelect = useAllowEditorDragToSelect();
+  const { isAutoHeightWithLimitsChanging } = useAutoHeightUIState();
 
   const handleWrapperClick = useCallback(() => {
-    if (allowDragToSelect) {
+    // Making sure that we don't deselect the widget
+    // after we are done dragging the limits in auto height with limits
+    if (allowDragToSelect && !isAutoHeightWithLimitsChanging) {
       focusWidget && focusWidget();
       deselectAll && deselectAll();
       dispatch(closePropertyPane());
       dispatch(closeTableFilterPane());
       dispatch(setCanvasSelectionFromEditor(false));
     }
-  }, [allowDragToSelect, focusWidget, deselectAll]);
+  }, [
+    allowDragToSelect,
+    focusWidget,
+    deselectAll,
+    isAutoHeightWithLimitsChanging,
+  ]);
 
   /**
    *  drag event handler for selection drawing
@@ -109,52 +109,31 @@ function WidgetsEditor() {
     [allowDragToSelect],
   );
 
-  const [propertyPaneWidth, setPropertyPaneWidth] = React.useState(
-    DEFAULT_PROPERTY_PANE_WIDTH,
-  );
-
-  /**
-   * on property pane sidebar drag end
-   *
-   * @return void
-   */
-  const onRightSidebarDragEnd = useCallback(() => {
-    dispatch(updateExplorerWidthAction(propertyPaneWidth));
-  }, [propertyPaneWidth]);
-
-  /**
-   * on property pane sidebar width change
-   */
-  const onRightSidebarWidthChange = useCallback((newWidth) => {
-    setPropertyPaneWidth(newWidth);
-  }, []);
-
   PerformanceTracker.stopTracking();
   return (
     <EditorContextProvider>
-      {enableFirstTimeUserOnboarding &&
-      showOnboardingTasks &&
-      !isOnboardingWidgetSelection ? (
+      {showOnboardingTasks ? (
         <OnboardingTasks />
       ) : (
         <>
           {guidedTourEnabled && <Guide />}
-          <div
-            className="relative overflow-hidden flex flex-row w-full"
-            data-testid="widgets-editor"
-            draggable
-            onClick={handleWrapperClick}
-            onDragStart={onDragStart}
-          >
-            <PageTabs />
-            <CanvasContainer />
-            <CrudInfoModal />
-            <Debugger />
-            <PropertyPaneSidebar
-              onDragEnd={onRightSidebarDragEnd}
-              onWidthChange={onRightSidebarWidthChange}
-              width={propertyPaneWidth}
-            />
+          <div className="relative flex flex-row w-full overflow-hidden">
+            <div className="relative flex flex-col w-full overflow-hidden">
+              <CanvasTopSection />
+              <div
+                className="relative flex flex-row w-full overflow-hidden"
+                data-testid="widgets-editor"
+                draggable
+                onClick={handleWrapperClick}
+                onDragStart={onDragStart}
+              >
+                <PageTabs />
+                <CanvasContainer />
+                <CrudInfoModal />
+                <Debugger />
+              </div>
+            </div>
+            <PropertyPaneContainer />
           </div>
         </>
       )}

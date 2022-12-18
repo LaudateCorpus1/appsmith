@@ -1,11 +1,13 @@
-import React, { memo, useCallback } from "react";
-import _, { isEqual } from "lodash";
+import React, { memo, useCallback, useEffect, useRef } from "react";
+import _, { get, isFunction } from "lodash";
+import equal from "fast-deep-equal/es6";
+import * as log from "loglevel";
+
 import {
   ControlPropertyLabelContainer,
   ControlWrapper,
-  JSToggleButton,
 } from "components/propertyControls/StyledControls";
-import { ControlIcons } from "icons/ControlIcons";
+import { JSToggleButton } from "design-system";
 import PropertyControlFactory from "utils/PropertyControlFactory";
 import PropertyHelpLabel from "pages/Editor/PropertyPane/PropertyHelpLabel";
 import { useDispatch, useSelector } from "react-redux";
@@ -17,62 +19,162 @@ import {
   setWidgetDynamicProperty,
   UpdateWidgetPropertyPayload,
 } from "actions/controlActions";
-import { PropertyPaneControlConfig } from "constants/PropertyControlConstants";
+import {
+  PropertyHookUpdates,
+  PropertyPaneControlConfig,
+} from "constants/PropertyControlConstants";
 import { IPanelProps } from "@blueprintjs/core";
 import PanelPropertiesEditor from "./PanelPropertiesEditor";
 import {
+  DynamicPath,
   getEvalValuePath,
+  isDynamicValue,
   isPathADynamicProperty,
   isPathADynamicTrigger,
+  THEME_BINDING_REGEX,
 } from "utils/DynamicBindingUtils";
 import {
+  getShouldFocusPropertyPath,
   getWidgetPropsForPropertyName,
   WidgetProperties,
 } from "selectors/propertyPaneSelectors";
-import { getWidgetEnhancementSelector } from "selectors/widgetEnhancementSelectors";
+import { EnhancementFns } from "selectors/widgetEnhancementSelectors";
 import { EditorTheme } from "components/editorComponents/CodeEditor/EditorConfig";
 import AppsmithConsole from "utils/AppsmithConsole";
 import { ENTITY_TYPE } from "entities/AppsmithConsole";
 import LOG_TYPE from "entities/AppsmithConsole/logtype";
 import { getExpectedValue } from "utils/validation/common";
 import { ControlData } from "components/propertyControls/BaseControl";
-import { AutocompleteDataType } from "utils/autocomplete/TernServer";
-import * as log from "loglevel";
+import { AppState } from "@appsmith/reducers";
+import { AutocompleteDataType } from "utils/autocomplete/CodemirrorTernService";
+import { TooltipComponent } from "design-system";
+import { ReactComponent as ResetIcon } from "assets/icons/control/undo_2.svg";
+import { JS_TOGGLE_DISABLED_MESSAGE } from "@appsmith/constants/messages";
+import {
+  getPropertyControlFocusElement,
+  shouldFocusOnPropertyControl,
+} from "utils/editorContextUtils";
+import PropertyPaneHelperText from "./PropertyPaneHelperText";
+import { setFocusablePropertyPaneField } from "actions/propertyPaneActions";
+import WidgetFactory from "utils/WidgetFactory";
 
 type Props = PropertyPaneControlConfig & {
   panel: IPanelProps;
   theme: EditorTheme;
+  isSearchResult: boolean;
+  enhancements: EnhancementFns | undefined;
 };
+
+const SHOULD_NOT_REJECT_DYNAMIC_BINDING_LIST_FOR = ["COLOR_PICKER"];
 
 const PropertyControl = memo((props: Props) => {
   const dispatch = useDispatch();
 
+  const controlRef = useRef<HTMLDivElement | null>(null);
+
   const propsSelector = getWidgetPropsForPropertyName(
     props.propertyName,
     props.dependencies,
+    props.evaluatedDependencies,
   );
 
-  const widgetProperties: WidgetProperties = useSelector(
-    propsSelector,
-    isEqual,
+  const widgetProperties: WidgetProperties = useSelector(propsSelector, equal);
+
+  // get the dataTreePath and apply enhancement if exists
+  let dataTreePath: string | undefined =
+    props.dataTreePath || widgetProperties
+      ? `${widgetProperties.widgetName}.${props.propertyName}`
+      : undefined;
+
+  // using hasDispatchedPropertyFocus to make sure
+  // the component does not select the state after dispatching the action,
+  // which might lead to another rerender and reset the component
+  const hasDispatchedPropertyFocus = useRef<boolean>(false);
+  const shouldFocusPropertyPath: boolean = useSelector(
+    (state: AppState) =>
+      getShouldFocusPropertyPath(
+        state,
+        dataTreePath,
+        hasDispatchedPropertyFocus.current,
+      ),
+    (before: boolean, after: boolean) => {
+      return hasDispatchedPropertyFocus.current || before === after;
+    },
   );
 
-  const enhancementSelector = getWidgetEnhancementSelector(
-    widgetProperties.widgetId,
-  );
+  const { enhancementFns, parentIdWithEnhancementFn } =
+    props.enhancements || {};
 
-  const { enhancementFns, parentIdWithEnhancementFn } = useSelector(
-    enhancementSelector,
-    isEqual,
-  );
+  useEffect(() => {
+    // This is required because layered panels like Column Panel have Animation of 300ms
+    const focusTimeout = props.isPanelProperty ? 300 : 0;
+    if (shouldFocusPropertyPath) {
+      setTimeout(() => {
+        if (shouldFocusOnPropertyControl(controlRef.current)) {
+          const focusableElement = getPropertyControlFocusElement(
+            controlRef.current,
+          );
+          focusableElement?.scrollIntoView({
+            block: "center",
+            behavior: "smooth",
+          });
+          focusableElement?.focus();
+        }
+      }, focusTimeout);
+    }
+  }, [shouldFocusPropertyPath]);
+  /**
+   * A property's stylesheet value can be fetched in 2 ways
+   * 1. If a method is defined on the property config (getStylesheetValue), then
+   *   it's the methods responsibility to resolve the stylesheet value.
+   * 2. If no such method is defined, the value is assumed to be present in the
+   *   theme config and thus it is fetched from there.
+   */
+  const propertyStylesheetValue = (() => {
+    const widgetStylesheet = WidgetFactory.getWidgetStylesheetConfigMap(
+      widgetProperties.type,
+    );
+
+    if (props.getStylesheetValue) {
+      return props.getStylesheetValue(
+        widgetProperties,
+        props.propertyName,
+        widgetStylesheet,
+      );
+    }
+
+    return get(widgetStylesheet, props.propertyName);
+  })();
+
+  const propertyValue = _.get(widgetProperties, props.propertyName);
+
+  /**
+   * checks if property value is deviated or not.
+   * by deviation, we mean if value of property is same as
+   * the one defined in the theme stylesheet. if values are different,
+   * that means the property value is deviated from the theme stylesheet.
+   */
+  const isPropertyDeviatedFromTheme =
+    typeof propertyStylesheetValue === "string" &&
+    THEME_BINDING_REGEX.test(propertyStylesheetValue) &&
+    propertyStylesheetValue !== propertyValue;
+
+  /**
+   * resets the value of property to theme stylesheet value
+   * which is a binding to theme object defined in the stylesheet
+   */
+  const resetPropertyValueToTheme = () => {
+    onPropertyChange(props.propertyName, propertyStylesheetValue);
+  };
 
   const {
     autoCompleteEnhancementFn: childWidgetAutoCompleteEnhancementFn,
     customJSControlEnhancementFn: childWidgetCustomJSControlEnhancementFn,
     hideEvaluatedValueEnhancementFn: childWidgetHideEvaluatedValueEnhancementFn,
     propertyPaneEnhancementFn: childWidgetPropertyUpdateEnhancementFn,
+    shouldHidePropertyFn: childWidgetShouldHidePropertyFn,
     updateDataTreePathFn: childWidgetDataTreePathEnhancementFn,
-  } = enhancementFns;
+  } = enhancementFns || {};
 
   const toggleDynamicProperty = useCallback(
     (propertyName: string, isDynamic: boolean) => {
@@ -82,11 +184,26 @@ const PropertyControl = memo((props: Props) => {
         propertyName: propertyName,
         propertyState: !isDynamic ? "JS" : "NORMAL",
       });
+
+      let shouldRejectDynamicBindingPathList = true;
+
+      // we don't want to remove the path from dynamic binding list
+      // on toggling of js in case of few widgets
+      if (
+        SHOULD_NOT_REJECT_DYNAMIC_BINDING_LIST_FOR.includes(
+          props.controlType,
+        ) &&
+        isDynamicValue(propertyValue)
+      ) {
+        shouldRejectDynamicBindingPathList = false;
+      }
+
       dispatch(
         setWidgetDynamicProperty(
           widgetProperties?.widgetId,
           propertyName,
           !isDynamic,
+          shouldRejectDynamicBindingPathList,
         ),
       );
     },
@@ -122,13 +239,8 @@ const PropertyControl = memo((props: Props) => {
   const getWidgetsOwnUpdatesOnPropertyChange = (
     propertyName: string,
     propertyValue: any,
-  ) => {
-    let propertiesToUpdate:
-      | Array<{
-          propertyPath: string;
-          propertyValue: any;
-        }>
-      | undefined;
+  ): UpdateWidgetPropertyPayload | undefined => {
+    let propertiesToUpdate: Array<PropertyHookUpdates> | undefined;
     // To support updating multiple properties of same widget.
     if (props.updateHook) {
       propertiesToUpdate = props.updateHook(
@@ -137,12 +249,38 @@ const PropertyControl = memo((props: Props) => {
         propertyValue,
       );
     }
+
     if (propertiesToUpdate) {
       const allUpdates: Record<string, unknown> = {};
-      propertiesToUpdate.forEach(({ propertyPath, propertyValue }) => {
-        allUpdates[propertyPath] = propertyValue;
-      });
+      const allDeletions: string[] = [];
+      const allDynamicPropertyPathUpdate: DynamicPath[] = [];
+      // TODO(abhinav): DEBUG: Ask Rahul and Ashok, if this causes issues anywhere else.
+
+      // We add the current updated first, so that the updatehooks can override the value
+      // This is needed for transformations in some cases. For example,
+      // the INPUT_TEXT control uses string as default, we can convert this into a number
+      // by calling an updateHook which runs the parseInt over this value.
       allUpdates[propertyName] = propertyValue;
+      propertiesToUpdate.forEach(
+        ({
+          isDynamicPropertyPath,
+          propertyPath,
+          propertyValue,
+          shouldDeleteProperty,
+        }) => {
+          if (shouldDeleteProperty) {
+            allDeletions.push(propertyPath);
+          } else {
+            allUpdates[propertyPath] = propertyValue;
+          }
+
+          if (isDynamicPropertyPath) {
+            allDynamicPropertyPathUpdate.push({
+              key: propertyPath,
+            });
+          }
+        },
+      );
       AppsmithConsole.info({
         logType: LOG_TYPE.WIDGET_UPDATE,
         text: "Widget properties were updated",
@@ -152,6 +290,9 @@ const PropertyControl = memo((props: Props) => {
           id: widgetProperties.widgetId,
           // TODO: Check whether these properties have
           // dependent properties
+          // We should send the path that the user sends
+          // instead of sending the path that was updated
+          // as a side effect
           propertyPath: propertiesToUpdate[0].propertyPath,
         },
         state: allUpdates,
@@ -160,6 +301,11 @@ const PropertyControl = memo((props: Props) => {
         widgetId: widgetProperties.widgetId,
         updates: {
           modify: allUpdates,
+          remove: allDeletions,
+          postUpdateAction: props.postUpdateAction,
+        },
+        dynamicUpdates: {
+          dynamicPropertyPathList: allDynamicPropertyPathUpdate,
         },
       };
     }
@@ -180,10 +326,12 @@ const PropertyControl = memo((props: Props) => {
           [propertyName]: propertyValue,
         },
       });
+
       return {
         widgetId: widgetProperties.widgetId,
         updates: {
           modify,
+          postUpdateAction: props.postUpdateAction,
         },
       };
     }
@@ -199,8 +347,8 @@ const PropertyControl = memo((props: Props) => {
     // would recommend NOT TO FOLLOW this path for upcoming widgets.
 
     // if there are enhancements related to the widget, calling them here
-    // enhancements are basically group of functions that are called before widget propety
-    // is changed on propertypane. For e.g - set/update parent property
+    // enhancements are basically group of functions that are called before widget property
+    // is changed on propertyPane. For e.g - set/update parent property
     if (childWidgetPropertyUpdateEnhancementFn) {
       const hookPropertiesUpdates = childWidgetPropertyUpdateEnhancementFn(
         widgetProperties.widgetName,
@@ -253,12 +401,18 @@ const PropertyControl = memo((props: Props) => {
    * It also calls the beforeChildPropertyUpdate hook
    */
   const onPropertyChange = useCallback(
-    (propertyName: string, propertyValue: any) => {
+    (
+      propertyName: string,
+      propertyValue: any,
+      isUpdatedViaKeyboard?: boolean,
+    ) => {
       AnalyticsUtil.logEvent("WIDGET_PROPERTY_UPDATE", {
         widgetType: widgetProperties.type,
         widgetName: widgetProperties.widgetName,
         propertyName: propertyName,
         updatedValue: propertyValue,
+        isUpdatedViaKeyboard,
+        isUpdatedFromSearchResult: props.isSearchResult,
       });
 
       const selfUpdates:
@@ -267,6 +421,7 @@ const PropertyControl = memo((props: Props) => {
         propertyName,
         propertyValue,
       );
+
       const enhancementsToOtherWidgets: UpdateWidgetPropertyPayload[] = getOtherWidgetPropertyChanges(
         propertyName,
         propertyValue,
@@ -281,6 +436,7 @@ const PropertyControl = memo((props: Props) => {
           );
         }
       }
+
       if (allPropertiesToUpdates && allPropertiesToUpdates.length) {
         // updating properties of a widget(s) should be done only once when property value changes.
         // to make sure dsl updates are atomic which is a necessity for undo/redo.
@@ -309,17 +465,30 @@ const PropertyControl = memo((props: Props) => {
     [props.panelConfig, onPropertyChange, props.propertyName],
   );
 
-  // Do not render the control if it needs to be hidden
-  if (props.hidden && props.hidden(widgetProperties, props.propertyName)) {
-    return null;
-  }
+  const { propertyName } = props;
 
-  const { label, propertyName } = props;
   if (widgetProperties) {
-    const propertyValue = _.get(widgetProperties, propertyName);
-    // get the dataTreePath and apply enhancement if exists
-    let dataTreePath: string =
+    // Do not render the control if it needs to be hidden
+    if (
+      (props.hidden && props.hidden(widgetProperties, props.propertyName)) ||
+      props.invisible ||
+      (childWidgetShouldHidePropertyFn &&
+        childWidgetShouldHidePropertyFn(props.propertyName))
+    ) {
+      return null;
+    }
+
+    const label = isFunction(props.label)
+      ? props.label(widgetProperties, propertyName)
+      : props.label;
+
+    const helperText = isFunction(props.helperText)
+      ? props.helperText(widgetProperties)
+      : props.helperText;
+
+    dataTreePath =
       props.dataTreePath || `${widgetProperties.widgetName}.${propertyName}`;
+
     if (childWidgetDataTreePathEnhancementFn) {
       dataTreePath = childWidgetDataTreePathEnhancementFn(
         dataTreePath,
@@ -328,7 +497,10 @@ const PropertyControl = memo((props: Props) => {
 
     const evaluatedValue = _.get(
       widgetProperties,
-      getEvalValuePath(dataTreePath, false),
+      getEvalValuePath(dataTreePath, {
+        isPopulated: true,
+        fullPath: false,
+      }),
     );
 
     const { additionalAutoComplete, ...rest } = props;
@@ -341,6 +513,7 @@ const PropertyControl = memo((props: Props) => {
       parentPropertyName: propertyName,
       parentPropertyValue: propertyValue,
       additionalDynamicData: {},
+      label,
     };
     config.expected = getExpectedValue(props.validation);
     if (isPathADynamicTrigger(widgetProperties, propertyName)) {
@@ -358,7 +531,7 @@ const PropertyControl = memo((props: Props) => {
       propertyName,
     );
     const isConvertible = !!props.isJSConvertible;
-    const className = props.label
+    const className = label
       .split(" ")
       .join("")
       .toLowerCase();
@@ -397,50 +570,132 @@ const PropertyControl = memo((props: Props) => {
       return false;
     };
 
+    const handleOnFocus = () => {
+      if (!shouldFocusPropertyPath) {
+        hasDispatchedPropertyFocus.current = true;
+        setTimeout(() => {
+          dispatch(setFocusablePropertyPaneField(dataTreePath));
+        }, 0);
+      }
+    };
+
     const uniqId = btoa(`${widgetProperties.widgetId}.${propertyName}`);
+    const canDisplayValueInUI = PropertyControlFactory.controlUIToggleValidation.get(
+      config.controlType,
+    );
+
+    const customJSControl = getCustomJSControl();
+
+    let isToggleDisabled = false;
+    if (
+      isDynamic // JS toggle button is ON
+    ) {
+      if (
+        // Check if value is not empty
+        propertyValue !== undefined &&
+        propertyValue !== ""
+      ) {
+        let value = propertyValue;
+        // extract out the value from binding, if there is custom JS control (Table & JSONForm widget)
+        if (customJSControl && isDynamicValue(value)) {
+          const extractValue = PropertyControlFactory.inputComputedValueMap.get(
+            customJSControl,
+          );
+          if (extractValue)
+            value = extractValue(value, widgetProperties.widgetName);
+        }
+
+        // disable button if value can't be represented in UI mode
+        if (!canDisplayValueInUI?.(config, value)) isToggleDisabled = true;
+      }
+
+      // Enable button if the value is same as the one defined in theme stylesheet.
+      if (
+        typeof propertyStylesheetValue === "string" &&
+        THEME_BINDING_REGEX.test(propertyStylesheetValue) &&
+        propertyStylesheetValue === propertyValue
+      ) {
+        isToggleDisabled = false;
+      }
+    }
 
     try {
       return (
         <ControlWrapper
-          className={`t--property-control-${className}`}
+          className={`t--property-control-wrapper t--property-control-${className} group`}
           data-guided-tour-iid={propertyName}
           id={uniqId}
           key={config.id}
+          onFocus={handleOnFocus}
           orientation={
             config.controlType === "SWITCH" && !isDynamic
               ? "HORIZONTAL"
               : "VERTICAL"
           }
+          ref={controlRef}
         >
-          <ControlPropertyLabelContainer>
+          <ControlPropertyLabelContainer className="gap-1">
             <PropertyHelpLabel
               label={label}
               theme={props.theme}
               tooltip={props.helpText}
             />
             {isConvertible && (
-              <JSToggleButton
-                active={isDynamic}
-                className={`t--js-toggle ${isDynamic ? "is-active" : ""}`}
-                onClick={() => toggleDynamicProperty(propertyName, isDynamic)}
+              <TooltipComponent
+                content={JS_TOGGLE_DISABLED_MESSAGE}
+                disabled={!isToggleDisabled}
+                hoverOpenDelay={200}
+                openOnTargetFocus={false}
+                position="auto"
               >
-                <ControlIcons.JS_TOGGLE />
-              </JSToggleButton>
+                <JSToggleButton
+                  handleClick={() =>
+                    toggleDynamicProperty(propertyName, isDynamic)
+                  }
+                  isActive={isDynamic}
+                  isToggleDisabled={isToggleDisabled}
+                />
+              </TooltipComponent>
+            )}
+            {isPropertyDeviatedFromTheme && (
+              <>
+                <TooltipComponent
+                  content="Value deviated from theme"
+                  openOnTargetFocus={false}
+                >
+                  <div className="w-2 h-2 rounded-full bg-primary-500" />
+                </TooltipComponent>
+                <button
+                  className="hidden ml-auto focus:ring-2 group-hover:block reset-button"
+                  onClick={resetPropertyValueToTheme}
+                >
+                  <TooltipComponent
+                    boundary="viewport"
+                    content="Reset value"
+                    openOnTargetFocus={false}
+                    position="top-right"
+                  >
+                    <ResetIcon className="w-5 h-5" />
+                  </TooltipComponent>
+                </button>
+              </>
             )}
           </ControlPropertyLabelContainer>
           {PropertyControlFactory.createControl(
             config,
             {
               onPropertyChange: onPropertyChange,
+              onBatchUpdateProperties: onBatchUpdateProperties,
               openNextPanel: openPanel,
               deleteProperties: onDeleteProperties,
               theme: props.theme,
             },
             isDynamic,
-            getCustomJSControl(),
+            customJSControl,
             additionAutocomplete,
             hideEvaluatedValue(),
           )}
+          <PropertyPaneHelperText helperText={helperText} />
         </ControlWrapper>
       );
     } catch (e) {

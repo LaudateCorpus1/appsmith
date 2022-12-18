@@ -5,7 +5,7 @@ import com.appsmith.server.domains.ActionCollection;
 import com.appsmith.server.domains.NewPage;
 import com.appsmith.server.dtos.ActionCollectionDTO;
 import com.appsmith.server.dtos.ActionCollectionViewDTO;
-import com.appsmith.server.dtos.ActionDTO;
+import com.appsmith.external.models.ActionDTO;
 import com.appsmith.server.services.CrudService;
 import org.springframework.data.domain.Sort;
 import org.springframework.util.MultiValueMap;
@@ -51,5 +51,7 @@ public interface ActionCollectionServiceCE extends CrudService<ActionCollection,
     Flux<ActionCollection> findByPageId(String pageId);
 
     Mono<ActionCollection> findByBranchNameAndDefaultCollectionId(String branchName, String defaultCollectionId, AclPermission permission);
+
+    Mono<List<ActionCollection>> archiveActionCollectionByApplicationId(String applicationId, AclPermission permission);
 
 }

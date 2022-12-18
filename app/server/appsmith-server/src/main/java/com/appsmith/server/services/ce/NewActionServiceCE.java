@@ -2,14 +2,16 @@ package com.appsmith.server.services.ce;
 
 import com.appsmith.external.dtos.ExecuteActionDTO;
 import com.appsmith.external.models.ActionExecutionResult;
+import com.appsmith.external.models.MustacheBindingToken;
 import com.appsmith.server.acl.AclPermission;
 import com.appsmith.server.domains.NewAction;
 import com.appsmith.server.domains.NewPage;
-import com.appsmith.server.dtos.ActionDTO;
+import com.appsmith.external.models.ActionDTO;
 import com.appsmith.server.dtos.ActionViewDTO;
 import com.appsmith.server.dtos.LayoutActionUpdateDTO;
 import com.appsmith.server.services.CrudService;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.codec.multipart.Part;
 import org.springframework.util.MultiValueMap;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -34,11 +36,11 @@ public interface NewActionServiceCE extends CrudService<NewAction, String> {
 
     Mono<ActionDTO> updateUnpublishedAction(String id, ActionDTO action);
 
-    Mono<ActionExecutionResult> executeAction(ExecuteActionDTO executeActionDTO);
+    Mono<ActionExecutionResult> executeAction(ExecuteActionDTO executeActionDTO, String environmentName);
+
+    Mono<ActionExecutionResult> executeAction(Flux<Part> partsFlux, String branchName, String environmentName);
 
     Mono<ActionDTO> getValidActionForExecution(ExecuteActionDTO executeActionDTO, String actionId, NewAction newAction);
-
-    Mono<ActionExecutionResult> executeAction(ExecuteActionDTO executeActionDTO, String branchName);
 
     <T> T variableSubstitution(T configuration, Map<String, String> replaceParamsMap);
 
@@ -78,11 +80,13 @@ public interface NewActionServiceCE extends CrudService<NewAction, String> {
 
     Flux<NewAction> findByPageId(String pageId);
 
-    Mono<NewAction> archive(String id);
+    Mono<NewAction> archive(NewAction newAction);
+
+    Mono<NewAction> archiveById(String id);
 
     Mono<List<NewAction>> archiveActionsByApplicationId(String applicationId, AclPermission permission);
 
-    List<String> extractMustacheKeysInOrder(String query);
+    List<MustacheBindingToken> extractMustacheKeysInOrder(String query);
 
     String replaceMustacheWithQuestionMark(String query, List<String> mustacheBindings);
 
@@ -96,4 +100,9 @@ public interface NewActionServiceCE extends CrudService<NewAction, String> {
 
     Mono<String> findBranchedIdByBranchNameAndDefaultActionId(String branchName, String defaultActionId, AclPermission permission);
 
+    public Mono<NewAction> sanitizeAction(NewAction action);
+
+    Mono<ActionDTO> fillSelfReferencingDataPaths(ActionDTO actionDTO);
+
+    Map<String, Object> getAnalyticsProperties(NewAction savedAction);
 }

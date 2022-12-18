@@ -1,16 +1,13 @@
-import { ReduxActionTypes, ReduxAction } from "constants/ReduxActionConstants";
-import { all, put, takeLatest } from "redux-saga/effects";
-import { updateRecentEntity } from "actions/globalSearchActions";
-
+import { matchPath } from "react-router";
+import { matchBasePath } from "pages/Editor/Explorer/helpers";
 import {
-  matchApiPath,
-  matchDatasourcePath,
-  matchQueryPath,
+  API_EDITOR_ID_PATH,
+  QUERIES_EDITOR_ID_PATH,
+  DATA_SOURCES_EDITOR_ID_PATH,
+  JS_COLLECTION_ID_PATH,
   matchBuilderPath,
-  matchJSObjectPath,
 } from "constants/routes";
-import { MAIN_CONTAINER_WIDGET_ID } from "constants/WidgetConstants";
-import { matchSaasPath } from "pages/Editor/SaaSEditor/constants";
+import { SAAS_EDITOR_API_ID_PATH } from "pages/Editor/SaaSEditor/constants";
 
 export const getEntityInCurrentPath = (pathName: string) => {
   const builderMatch = matchBuilderPath(pathName);
@@ -21,15 +18,15 @@ export const getEntityInCurrentPath = (pathName: string) => {
       params: builderMatch?.params,
     };
 
-  const saasMatch = matchSaasPath(pathName);
-  if (saasMatch)
-    return {
-      type: "action",
-      id: saasMatch?.params?.apiId,
-      params: saasMatch?.params,
-    };
-
-  const apiMatch = matchApiPath(pathName);
+  const baseMatch = matchBasePath(pathName);
+  if (!baseMatch) return { type: "", id: "" };
+  const { path: basePath } = baseMatch;
+  const apiMatch = matchPath<{ apiId: string }>(pathName, {
+    path: [
+      `${basePath}${API_EDITOR_ID_PATH}`,
+      `${basePath}${SAAS_EDITOR_API_ID_PATH}`,
+    ],
+  });
   if (apiMatch)
     return {
       type: "action",
@@ -37,7 +34,9 @@ export const getEntityInCurrentPath = (pathName: string) => {
       params: apiMatch?.params,
     };
 
-  const queryMatch = matchQueryPath(pathName);
+  const queryMatch = matchPath<{ queryId: string }>(pathName, {
+    path: `${basePath}${QUERIES_EDITOR_ID_PATH}`,
+  });
   if (queryMatch)
     return {
       type: "action",
@@ -45,7 +44,9 @@ export const getEntityInCurrentPath = (pathName: string) => {
       params: queryMatch?.params,
     };
 
-  const datasourceMatch = matchDatasourcePath(pathName);
+  const datasourceMatch = matchPath<{ datasourceId: string }>(pathName, {
+    path: `${basePath}${DATA_SOURCES_EDITOR_ID_PATH}`,
+  });
   if (datasourceMatch)
     return {
       type: "datasource",
@@ -53,7 +54,9 @@ export const getEntityInCurrentPath = (pathName: string) => {
       params: datasourceMatch?.params,
     };
 
-  const jsObjectMatch = matchJSObjectPath(pathName);
+  const jsObjectMatch = matchPath<{ collectionId: string }>(pathName, {
+    path: `${basePath}${JS_COLLECTION_ID_PATH}`,
+  });
   if (jsObjectMatch) {
     return {
       type: "jsAction",
@@ -62,37 +65,8 @@ export const getEntityInCurrentPath = (pathName: string) => {
     };
   }
 
-  return {};
+  return {
+    type: "",
+    id: "",
+  };
 };
-
-function* handleSelectWidget(action: ReduxAction<{ widgetId: string }>) {
-  const builderMatch = matchBuilderPath(window.location.pathname);
-  const { payload } = action;
-  const selectedWidget = payload.widgetId;
-  if (selectedWidget && selectedWidget !== MAIN_CONTAINER_WIDGET_ID)
-    yield put(
-      updateRecentEntity({
-        type: "widget",
-        id: selectedWidget,
-        params: builderMatch?.params,
-      }),
-    );
-}
-
-function* handlePathUpdated(
-  action: ReduxAction<{ location: typeof window.location }>,
-) {
-  const { id, params, type } = getEntityInCurrentPath(
-    action.payload.location.pathname,
-  );
-  if (type && id && id.indexOf(":") === -1) {
-    yield put(updateRecentEntity({ type, id, params }));
-  }
-}
-
-export default function* recentEntitiesSagas() {
-  yield all([
-    takeLatest(ReduxActionTypes.SELECT_WIDGET_INIT, handleSelectWidget),
-    takeLatest(ReduxActionTypes.HANDLE_PATH_UPDATED, handlePathUpdated),
-  ]);
-}

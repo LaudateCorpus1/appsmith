@@ -3,6 +3,7 @@ package com.appsmith.server.configurations;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -34,8 +35,8 @@ public class CommonConfig {
     @Value("${appsmith.instance.name:}")
     private String instanceName;
 
-    @Value("${signup.disabled}")
-    private boolean isSignupDisabled;
+    @Setter(AccessLevel.NONE)
+    private boolean isSignupDisabled = false;
 
     @Setter(AccessLevel.NONE)
     private Set<String> adminEmails = Collections.emptySet();
@@ -62,7 +63,10 @@ public class CommonConfig {
     @Value("${disable.telemetry:true}")
     private boolean isTelemetryDisabled;
 
+    private String rtsBaseDomain = "http://127.0.0.1:8091";
+
     private List<String> allowedDomains;
+
 
     @Bean
     public Scheduler scheduler() {
@@ -79,6 +83,7 @@ public class CommonConfig {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
         return objectMapper;
     }
@@ -109,6 +114,12 @@ public class CommonConfig {
     @Autowired
     public void setAdminEmails(@Value("${admin.emails}") String value) {
         adminEmails = Set.of(value.trim().split("\\s*,\\s*"));
+    }
+
+    @Autowired
+    public void setSignupDisabled(@Value("${signup.disabled}") String value) {
+        // If `true`, then disable signup. If anything else, including empty string, then signups will be enabled.
+        isSignupDisabled = "true".equalsIgnoreCase(value);
     }
 
 }

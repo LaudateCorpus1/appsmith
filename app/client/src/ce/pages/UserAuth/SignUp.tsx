@@ -1,20 +1,15 @@
 import React, { useEffect } from "react";
 import { reduxForm, InjectedFormProps, formValueSelector } from "redux-form";
 import { AUTH_LOGIN_URL } from "constants/routes";
-import { SIGNUP_FORM_NAME } from "constants/forms";
+import { SIGNUP_FORM_NAME } from "@appsmith/constants/forms";
 import {
   RouteComponentProps,
   useHistory,
   useLocation,
   withRouter,
+  Link,
 } from "react-router-dom";
-import {
-  AuthCardHeader,
-  AuthCardNavLink,
-  SpacedSubmitForm,
-  FormActions,
-  SignUpLinkSection,
-} from "pages/UserAuth/StyledComponents";
+import { SpacedSubmitForm, FormActions } from "pages/UserAuth/StyledComponents";
 import {
   SIGNUP_PAGE_TITLE,
   SIGNUP_PAGE_EMAIL_INPUT_LABEL,
@@ -28,13 +23,12 @@ import {
   SIGNUP_PAGE_SUBMIT_BUTTON_TEXT,
   ALREADY_HAVE_AN_ACCOUNT,
   createMessage,
+  SIGNUP_PAGE_SUBTITLE,
 } from "@appsmith/constants/messages";
-import FormMessage from "components/ads/formFields/FormMessage";
-import FormGroup from "components/ads/formFields/FormGroup";
-import FormTextField from "components/ads/formFields/TextField";
+import FormTextField from "components/utils/ReduxFormTextField";
 import ThirdPartyAuth from "@appsmith/pages/UserAuth/ThirdPartyAuth";
 import { ThirdPartyLoginRegistry } from "pages/UserAuth/ThirdPartyLoginRegistry";
-import Button, { Size } from "components/ads/Button";
+import { Button, FormGroup, FormMessage, Size } from "design-system";
 
 import { isEmail, isStrongPassword, isEmptyString } from "utils/formhelpers";
 
@@ -43,25 +37,26 @@ import AnalyticsUtil from "utils/AnalyticsUtil";
 
 import { SIGNUP_SUBMIT_PATH } from "@appsmith/constants/ApiConstants";
 import { connect } from "react-redux";
-import { AppState } from "reducers";
+import { AppState } from "@appsmith/reducers";
 import PerformanceTracker, {
   PerformanceTransactionName,
 } from "utils/PerformanceTracker";
 
-import { SIGNUP_FORM_EMAIL_FIELD_NAME } from "constants/forms";
+import { SIGNUP_FORM_EMAIL_FIELD_NAME } from "@appsmith/constants/forms";
 import { getAppsmithConfigs } from "@appsmith/configs";
 import { useScript, ScriptStatus, AddScriptTo } from "utils/hooks/useScript";
 
 import { withTheme } from "styled-components";
 import { Theme } from "constants/DefaultTheme";
 import { getIsSafeRedirectURL } from "utils/helpers";
+import Container from "pages/UserAuth/Container";
 
 declare global {
   interface Window {
     grecaptcha: any;
   }
 }
-const { disableSignup, googleRecaptchaSiteKey } = getAppsmithConfigs();
+const { disableLoginForm, googleRecaptchaSiteKey } = getAppsmithConfigs();
 
 const validate = (values: SignupFormValues) => {
   const errors: SignupFormValues = {};
@@ -87,13 +82,18 @@ type SignUpFormProps = InjectedFormProps<
 export function SignUp(props: SignUpFormProps) {
   const history = useHistory();
   useEffect(() => {
-    if (disableSignup) {
-      history.replace(AUTH_LOGIN_URL);
+    if (disableLoginForm) {
+      const search = new URL(window.location.href)?.searchParams?.toString();
+      history.replace({
+        pathname: AUTH_LOGIN_URL,
+        search,
+      });
     }
   }, []);
   const { emailValue: email, error, pristine, submitting, valid } = props;
   const isFormValid = valid && email && !isEmptyString(email);
   const socialLoginList = ThirdPartyLoginRegistry.get();
+  const shouldDisableSignupButton = pristine || !isFormValid;
   const location = useLocation();
 
   const recaptchaStatus = useScript(
@@ -109,107 +109,119 @@ export function SignUp(props: SignUpFormProps) {
     showError = true;
   }
 
-  let signupURL = "/api/v1/" + SIGNUP_SUBMIT_PATH;
-  if (queryParams.has("appId")) {
-    signupURL += `?appId=${queryParams.get("appId")}`;
+  const signupURL = new URL(
+    `/api/v1/` + SIGNUP_SUBMIT_PATH,
+    window.location.origin,
+  );
+  const appId = queryParams.get("appId");
+  if (appId) {
+    signupURL.searchParams.append("appId", appId);
   } else {
     const redirectUrl = queryParams.get("redirectUrl");
     if (redirectUrl != null && getIsSafeRedirectURL(redirectUrl)) {
-      signupURL += `?redirectUrl=${encodeURIComponent(redirectUrl)}`;
+      signupURL.searchParams.append("redirectUrl", redirectUrl);
     }
   }
 
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formElement: HTMLFormElement = document.getElementById(
+      "signup-form",
+    ) as HTMLFormElement;
+    if (
+      googleRecaptchaSiteKey.enabled &&
+      recaptchaStatus === ScriptStatus.READY
+    ) {
+      window.grecaptcha
+        .execute(googleRecaptchaSiteKey.apiKey, {
+          action: "submit",
+        })
+        .then(function(token: any) {
+          if (formElement) {
+            signupURL.searchParams.append("recaptchaToken", token);
+            formElement.setAttribute("action", signupURL.toString());
+            formElement.submit();
+          }
+        });
+    } else {
+      formElement && formElement.submit();
+    }
+  };
+
+  const footerSection = (
+    <div className="px-2 py-4 text-base text-center border-b">
+      {createMessage(ALREADY_HAVE_AN_ACCOUNT)}
+      <Link
+        className="t--sign-up ml-2 text-[color:var(--ads-color-brand)] hover:text-[color:var(--ads-color-brand)]"
+        to={AUTH_LOGIN_URL}
+      >
+        {createMessage(SIGNUP_PAGE_LOGIN_LINK_TEXT)}
+      </Link>
+    </div>
+  );
+
   return (
-    <>
+    <Container
+      footer={footerSection}
+      subtitle={createMessage(SIGNUP_PAGE_SUBTITLE)}
+      title={createMessage(SIGNUP_PAGE_TITLE)}
+    >
       {showError && <FormMessage intent="danger" message={errorMessage} />}
-      <AuthCardHeader>
-        <h1>{createMessage(SIGNUP_PAGE_TITLE)}</h1>
-      </AuthCardHeader>
-      <SignUpLinkSection>
-        {createMessage(ALREADY_HAVE_AN_ACCOUNT)}
-        <AuthCardNavLink
-          style={{ marginLeft: props.theme.spaces[3] }}
-          to={AUTH_LOGIN_URL}
-        >
-          {createMessage(SIGNUP_PAGE_LOGIN_LINK_TEXT)}
-        </AuthCardNavLink>
-      </SignUpLinkSection>
       {socialLoginList.length > 0 && (
         <ThirdPartyAuth logins={socialLoginList} type={"SIGNUP"} />
       )}
-      <SpacedSubmitForm
-        action={signupURL}
-        id="signup-form"
-        method="POST"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const formElement: HTMLFormElement = document.getElementById(
-            "signup-form",
-          ) as HTMLFormElement;
-          if (
-            googleRecaptchaSiteKey.enabled &&
-            recaptchaStatus === ScriptStatus.READY
-          ) {
-            window.grecaptcha
-              .execute(googleRecaptchaSiteKey.apiKey, {
-                action: "submit",
-              })
-              .then(function(token: any) {
-                formElement &&
-                  formElement.setAttribute(
-                    "action",
-                    `${signupURL}?recaptchaToken=${token}`,
-                  );
-                formElement && formElement.submit();
-              });
-          } else {
-            formElement && formElement.submit();
-          }
-          return false;
-        }}
-      >
-        <FormGroup
-          intent={error ? "danger" : "none"}
-          label={createMessage(SIGNUP_PAGE_EMAIL_INPUT_LABEL)}
+      {!disableLoginForm && (
+        <SpacedSubmitForm
+          action={signupURL.toString()}
+          id="signup-form"
+          method="POST"
+          onSubmit={(e) => handleSubmit(e)}
         >
-          <FormTextField
-            autoFocus
-            name="email"
-            placeholder={createMessage(SIGNUP_PAGE_EMAIL_INPUT_PLACEHOLDER)}
-            type="email"
-          />
-        </FormGroup>
-        <FormGroup
-          intent={error ? "danger" : "none"}
-          label={createMessage(SIGNUP_PAGE_PASSWORD_INPUT_LABEL)}
-        >
-          <FormTextField
-            name="password"
-            placeholder={createMessage(SIGNUP_PAGE_PASSWORD_INPUT_PLACEHOLDER)}
-            type="password"
-          />
-        </FormGroup>
-        <FormActions>
-          <Button
-            disabled={pristine || !isFormValid}
-            fill
-            isLoading={submitting}
-            onClick={() => {
-              AnalyticsUtil.logEvent("SIGNUP_CLICK", {
-                signupMethod: "EMAIL",
-              });
-              PerformanceTracker.startTracking(
-                PerformanceTransactionName.SIGN_UP,
-              );
-            }}
-            size={Size.large}
-            tag="button"
-            text={createMessage(SIGNUP_PAGE_SUBMIT_BUTTON_TEXT)}
-            type="submit"
-          />
-        </FormActions>
-      </SpacedSubmitForm>
-    </>
+          <FormGroup
+            intent={error ? "danger" : "none"}
+            label={createMessage(SIGNUP_PAGE_EMAIL_INPUT_LABEL)}
+          >
+            <FormTextField
+              autoFocus
+              name="email"
+              placeholder={createMessage(SIGNUP_PAGE_EMAIL_INPUT_PLACEHOLDER)}
+              type="email"
+            />
+          </FormGroup>
+          <FormGroup
+            intent={error ? "danger" : "none"}
+            label={createMessage(SIGNUP_PAGE_PASSWORD_INPUT_LABEL)}
+          >
+            <FormTextField
+              name="password"
+              placeholder={createMessage(
+                SIGNUP_PAGE_PASSWORD_INPUT_PLACEHOLDER,
+              )}
+              type="password"
+            />
+          </FormGroup>
+          <FormActions>
+            <Button
+              disabled={shouldDisableSignupButton}
+              fill
+              isLoading={submitting}
+              onClick={() => {
+                AnalyticsUtil.logEvent("SIGNUP_CLICK", {
+                  signupMethod: "EMAIL",
+                });
+                PerformanceTracker.startTracking(
+                  PerformanceTransactionName.SIGN_UP,
+                );
+              }}
+              size={Size.large}
+              tag="button"
+              text={createMessage(SIGNUP_PAGE_SUBMIT_BUTTON_TEXT)}
+              type="submit"
+            />
+          </FormActions>
+        </SpacedSubmitForm>
+      )}
+    </Container>
   );
 }
 

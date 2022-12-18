@@ -1,29 +1,36 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useMemo, useCallback, useEffect } from "react";
 import styled from "styled-components";
-import Icon, { IconSize } from "components/ads/Icon";
+import {
+  Classes,
+  FontWeight,
+  Icon,
+  IconSize,
+  TabComponent,
+  Text,
+  TextType,
+} from "design-system";
 import { StyledSeparator } from "pages/Applications/ProductUpdatesModal/ReleaseComponent";
-import { DATA_SOURCES_EDITOR_ID_URL } from "constants/routes";
 import history from "utils/history";
-import { TabComponent } from "components/ads/Tabs";
-import Text, { FontWeight, TextType } from "components/ads/Text";
-import { TabbedViewContainer } from "./Form";
+import { TabbedViewContainer } from "./CommonEditorForm";
 import get from "lodash/get";
-import { getQueryParams } from "../../../utils/AppsmithUtils";
+import { getQueryParams } from "utils/URLUtils";
 import ActionRightPane, {
   useEntityDependencies,
 } from "components/editorComponents/ActionRightPane";
-import { useSelector } from "react-redux";
-import { Classes } from "components/ads/common";
-import { getCurrentApplicationId } from "selectors/editorSelectors";
 import { Colors } from "constants/Colors";
 import { sortedDatasourcesHandler } from "./helpers";
+import { datasourcesEditorIdURL } from "RouteBuilder";
+import { setApiRightPaneSelectedTab } from "actions/apiPaneActions";
+import { useDispatch, useSelector } from "react-redux";
+import { getApiRightPaneSelectedTab } from "selectors/apiPaneSelectors";
+import isUndefined from "lodash/isUndefined";
 
 const EmptyDatasourceContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 50px;
-  border-left: 2px solid ${(props) => props.theme.colors.apiPane.dividerBg};
+  border-left: 1px solid ${(props) => props.theme.colors.apiPane.dividerBg};
   height: 100%;
   flex-direction: column;
   .${Classes.TEXT} {
@@ -32,16 +39,24 @@ const EmptyDatasourceContainer = styled.div`
 `;
 
 const DatasourceContainer = styled.div`
-  .react-tabs__tab-list {
+  &&&&&&&&&&& .react-tabs__tab-list {
     padding: 0 16px !important;
     border-bottom: none;
-    border-left: 2px solid #e8e8e8;
+    border-left: 1px solid #e8e8e8;
+    margin-left: 0px;
+    margin-right: 0px;
     .cs-icon {
       margin-right: 0;
     }
   }
   width: ${(props) => props.theme.actionSidePane.width}px;
   color: ${(props) => props.theme.colors.apiPane.text};
+
+  &&&& {
+    .react-tabs__tab-panel {
+      height: calc(100% - 32px);
+    }
+  }
 `;
 
 const DataSourceListWrapper = styled.div`
@@ -49,7 +64,7 @@ const DataSourceListWrapper = styled.div`
   flex-direction: column;
   height: 100%;
   padding: 10px;
-  border-left: 2px solid ${(props) => props.theme.colors.apiPane.dividerBg};
+  border-left: 1px solid ${(props) => props.theme.colors.apiPane.dividerBg};
   overflow: auto;
 `;
 
@@ -147,7 +162,7 @@ const SelectedDatasourceInfoContainer = styled.div`
 `;
 
 const SomeWrapper = styled.div`
-  border-left: 2px solid ${(props) => props.theme.colors.apiPane.dividerBg};
+  border-left: 1px solid ${(props) => props.theme.colors.apiPane.dividerBg};
   height: 100%;
 `;
 
@@ -196,17 +211,22 @@ export const getDatasourceInfo = (datasource: any): string => {
   if (authType.length) info.push(authType);
   return info.join(" | ");
 };
-
 function ApiRightPane(props: any) {
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const dispatch = useDispatch();
   const { entityDependencies, hasDependencies } = useEntityDependencies(
     props.actionName,
   );
-  useEffect(() => {
-    if (!!props.hasResponse) setSelectedIndex(1);
-  }, [props.hasResponse]);
+  const selectedTab = useSelector(getApiRightPaneSelectedTab);
 
-  const applicationId = useSelector(getCurrentApplicationId);
+  const setSelectedTab = useCallback((selectedIndex: number) => {
+    dispatch(setApiRightPaneSelectedTab(selectedIndex));
+  }, []);
+
+  useEffect(() => {
+    // Switch to connections tab only initially after successfully run get stored value
+    // otherwise
+    if (!!props.hasResponse && isUndefined(selectedTab)) setSelectedTab(1);
+  }, [props.hasResponse]);
 
   // array of datasources with the current action's datasource first, followed by the rest.
   const sortedDatasources = useMemo(
@@ -222,8 +242,9 @@ function ApiRightPane(props: any) {
     <DatasourceContainer>
       <TabbedViewContainer>
         <TabComponent
-          onSelect={setSelectedIndex}
-          selectedIndex={selectedIndex}
+          cypressSelector={"api-right-pane"}
+          onSelect={setSelectedTab}
+          selectedIndex={isUndefined(selectedTab) ? 0 : selectedTab}
           tabs={[
             {
               key: "datasources",
@@ -231,7 +252,7 @@ function ApiRightPane(props: any) {
               panelComponent:
                 props.datasources && props.datasources.length > 0 ? (
                   <DataSourceListWrapper
-                    className={selectedIndex === 0 ? "show" : ""}
+                    className={selectedTab === 0 ? "show" : ""}
                   >
                     {(sortedDatasources || []).map((d: any, idx: number) => {
                       const dataSourceInfo: string = getDatasourceInfo(d);
@@ -252,15 +273,14 @@ function ApiRightPane(props: any) {
                               )}
                               <Icon
                                 name="edit"
-                                onClick={(e) => {
+                                onClick={(e: React.MouseEvent) => {
                                   e.stopPropagation();
                                   history.push(
-                                    DATA_SOURCES_EDITOR_ID_URL(
-                                      applicationId,
-                                      props.currentPageId,
-                                      d.id,
-                                      getQueryParams(),
-                                    ),
+                                    datasourcesEditorIdURL({
+                                      pageId: props.currentPageId,
+                                      datasourceId: d.id,
+                                      params: getQueryParams(),
+                                    }),
                                   );
                                 }}
                                 size={IconSize.LARGE}
@@ -268,7 +288,7 @@ function ApiRightPane(props: any) {
                             </IconContainer>
                           </DataSourceNameContainer>
                           <DatasourceURL>
-                            {d.datasourceConfiguration.url}
+                            {d.datasourceConfiguration?.url}
                           </DatasourceURL>
                           {dataSourceInfo && (
                             <>
@@ -304,7 +324,7 @@ function ApiRightPane(props: any) {
                 ),
             },
             {
-              key: "Connections",
+              key: "connections",
               title: "Connections",
               panelComponent: (
                 <SomeWrapper>

@@ -1,15 +1,15 @@
 import React, {
-  useState,
-  useMemo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
+  useState,
 } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import styled, { ThemeProvider } from "styled-components";
 import { useParams } from "react-router";
-import history from "utils/history";
-import { AppState } from "reducers";
+import history, { NavigationMethod } from "utils/history";
+import { AppState } from "@appsmith/reducers";
 import SearchModal from "./SearchModal";
 import AlgoliaSearchWrapper from "./AlgoliaSearchWrapper";
 import SearchBox from "./SearchBox";
@@ -21,50 +21,43 @@ import Description from "./Description";
 import ResultsNotFound from "./ResultsNotFound";
 import { useNavigateToWidget } from "pages/Editor/Explorer/Widgets/useNavigateToWidget";
 import {
-  toggleShowGlobalSearchModal,
-  setGlobalSearchQuery,
-  setGlobalSearchFilterContext,
   cancelSnippet,
   insertSnippet,
+  setGlobalSearchFilterContext,
+  setGlobalSearchQuery,
+  toggleShowGlobalSearchModal,
 } from "actions/globalSearchActions";
 import {
-  getItemType,
-  getItemTitle,
-  getItemPage,
-  SEARCH_ITEM_TYPES,
-  useDefaultDocumentationResults,
-  DocSearchItem,
-  SearchItem,
   algoliaHighlightTag,
-  SEARCH_CATEGORY_ID,
-  getEntityId,
+  DocSearchItem,
   filterCategories,
+  getEntityId,
   getFilterCategoryList,
-  SearchCategory,
-  isNavigation,
-  isMenu,
-  isSnippet,
-  isDocumentation,
-  SelectEvent,
+  getItemPage,
+  getItemTitle,
+  getItemType,
   getOptionalFilters,
   isActionOperation,
+  isDocumentation,
   isMatching,
+  isMenu,
+  isNavigation,
+  isSnippet,
+  SEARCH_CATEGORY_ID,
+  SEARCH_ITEM_TYPES,
+  SearchCategory,
+  SearchItem,
+  SelectEvent,
 } from "./utils";
 import { getActionConfig } from "pages/Editor/Explorer/Actions/helpers";
 import { HelpBaseURL } from "constants/HelpConstants";
 import { ExplorerURLParams } from "pages/Editor/Explorer/helpers";
-import {
-  BUILDER_PAGE_URL,
-  DATA_SOURCES_EDITOR_ID_URL,
-  JS_COLLECTION_ID_URL,
-} from "constants/routes";
-import { getSelectedWidget } from "selectors/ui";
+import { getLastSelectedWidget } from "selectors/ui";
 import AnalyticsUtil from "utils/AnalyticsUtil";
-import { getCurrentApplicationId } from "selectors/editorSelectors";
 import useRecentEntities from "./useRecentEntities";
 import { get, noop } from "lodash";
 import { getCurrentPageId } from "selectors/editorSelectors";
-import { getQueryParams } from "../../../utils/AppsmithUtils";
+import { getQueryParams } from "utils/URLUtils";
 import SnippetsFilter from "./SnippetsFilter";
 import SnippetRefinements from "./SnippetRefinements";
 import { Configure, Index } from "react-instantsearch-dom";
@@ -73,8 +66,7 @@ import { lightTheme } from "selectors/themeSelectors";
 import { SnippetAction } from "reducers/uiReducers/globalSearchReducer";
 import copy from "copy-to-clipboard";
 import { getSnippet } from "./SnippetsDescription";
-import { Variant } from "components/ads/common";
-import { Toaster } from "components/ads/Toast";
+import { Toaster, Variant } from "design-system";
 import {
   useFilteredActions,
   useFilteredFileOperations,
@@ -82,6 +74,13 @@ import {
   useFilteredPages,
   useFilteredWidgets,
 } from "./GlobalSearchHooks";
+import {
+  builderURL,
+  datasourcesEditorIdURL,
+  jsCollectionIdURL,
+} from "RouteBuilder";
+import { getPlugins } from "selectors/entitiesSelector";
+import { TEMP_DATASOURCE_ID } from "constants/Datasource";
 
 const StyledContainer = styled.div<{ category: SearchCategory; query: string }>`
   width: ${({ category, query }) =>
@@ -175,7 +174,7 @@ const getSortedResults = (
 const filterCategoryList = getFilterCategoryList();
 
 function GlobalSearch() {
-  const currentPageId = useSelector(getCurrentPageId);
+  const currentPageId = useSelector(getCurrentPageId) as string;
   const modalOpen = useSelector(isModalOpenSelector);
   const dispatch = useDispatch();
   const [snippets, setSnippetsState] = useState([]);
@@ -192,6 +191,7 @@ function GlobalSearch() {
   const category = useSelector(
     (state: AppState) => state.ui.globalSearch.filterContext.category,
   );
+  const plugins = useSelector(getPlugins);
   const setCategory = useCallback(
     (category: SearchCategory) => {
       if (isSnippet(category)) {
@@ -206,9 +206,7 @@ function GlobalSearch() {
   const refinements = useSelector(
     (state: AppState) => state.ui.globalSearch.filterContext.refinements,
   );
-  const defaultDocs = useDefaultDocumentationResults(modalOpen);
   const params = useParams<ExplorerURLParams>();
-  const applicationId = useSelector(getCurrentApplicationId);
 
   const toggleShow = () => {
     if (modalOpen) {
@@ -246,7 +244,9 @@ function GlobalSearch() {
   }, [refinements]);
 
   const reducerDatasources = useSelector((state: AppState) => {
-    return state.entities.datasources.list;
+    return state.entities.datasources.list.filter(
+      (datasource) => datasource.id !== TEMP_DATASOURCE_ID,
+    );
   });
   const datasourcesList = useMemo(() => {
     return reducerDatasources.map((datasource) => ({
@@ -276,7 +276,7 @@ function GlobalSearch() {
   );
 
   const resetSearchQuery = useSelector(searchQuerySelector);
-  const selectedWidgetId = useSelector(getSelectedWidget);
+  const lastSelectedWidgetId = useSelector(getLastSelectedWidget);
 
   // keeping query in component state until we can figure out fixed for the perf issues
   // this is used to update query from outside the component, for ex. using the help button within prop. pane
@@ -300,7 +300,12 @@ function GlobalSearch() {
 
   const searchResults = useMemo(() => {
     if (isMenu(category) && !query) {
-      return filterCategoryList.filter((cat: SearchCategory) => !isMenu(cat));
+      const shouldRemoveActionCreation = !filteredFileOperations.length;
+      return filterCategoryList.filter(
+        (cat: SearchCategory) =>
+          !isMenu(cat) &&
+          (isActionOperation(cat) ? !shouldRemoveActionCreation : true),
+      );
     }
     if (isActionOperation(category)) {
       return filteredFileOperations;
@@ -322,9 +327,7 @@ function GlobalSearch() {
       ];
     }
     if (isDocumentation(category) || isMenu(category)) {
-      documents = query
-        ? documentationSearchResults
-        : defaultDocs.concat(documentationSearchResults);
+      documents = documentationSearchResults;
     }
     if (isNavigation(category) || isDocumentation(category)) {
       currentSnippets = [];
@@ -393,7 +396,7 @@ function GlobalSearch() {
     event?: SelectEvent,
   ) => {
     if (event && event.type === "click") return;
-    window.open(item.path.replace("master", HelpBaseURL), "_blank");
+    window.open(`${HelpBaseURL}/${item.path}`, "_blank");
   };
 
   const handleWidgetClick = (activeItem: SearchItem) => {
@@ -402,42 +405,54 @@ function GlobalSearch() {
       activeItem.widgetId,
       activeItem.type,
       activeItem.pageId,
-      selectedWidgetId === activeItem.widgetId,
-      activeItem.parentModalId,
+      NavigationMethod.Omnibar,
+      lastSelectedWidgetId === activeItem.widgetId,
     );
   };
 
   const handleActionClick = (item: SearchItem) => {
     const { config } = item;
-    const { id, pageId, pluginType } = config;
+    const { id, pageId, pluginId, pluginType } = config;
     const actionConfig = getActionConfig(pluginType);
-    const url = actionConfig?.getURL(applicationId, pageId, id, pluginType);
+    const plugin = plugins.find((plugin) => plugin?.id === pluginId);
+    const url = actionConfig?.getURL(pageId, id, pluginType, plugin);
     toggleShow();
-    url && history.push(url);
+    url && history.push(url, { invokedBy: NavigationMethod.Omnibar });
   };
 
   const handleJSCollectionClick = (item: SearchItem) => {
     const { config } = item;
     const { id, pageId } = config;
-    history.push(JS_COLLECTION_ID_URL(applicationId, pageId, id));
+    history.push(
+      jsCollectionIdURL({
+        pageId,
+        collectionId: id,
+      }),
+      { invokedBy: NavigationMethod.Omnibar },
+    );
     toggleShow();
   };
 
   const handleDatasourceClick = (item: SearchItem) => {
     toggleShow();
     history.push(
-      DATA_SOURCES_EDITOR_ID_URL(
-        applicationId,
-        item.pageId,
-        item.id,
-        getQueryParams(),
-      ),
+      datasourcesEditorIdURL({
+        pageId: item.pageId,
+        datasourceId: item.id,
+        params: getQueryParams(),
+      }),
+      { invokedBy: NavigationMethod.Omnibar },
     );
   };
 
   const handlePageClick = (item: SearchItem) => {
     toggleShow();
-    history.push(BUILDER_PAGE_URL({ applicationId, pageId: item.pageId }));
+    history.push(
+      builderURL({
+        pageId: item.pageId,
+      }),
+      { invokedBy: NavigationMethod.Omnibar },
+    );
   };
 
   const onEnterSnippet = useSelector(
@@ -488,8 +503,7 @@ function GlobalSearch() {
       handleSnippetClick(e, item),
     [SEARCH_ITEM_TYPES.actionOperation]: (e: SelectEvent, item: any) => {
       if (item.action) dispatch(item.action(currentPageId, "OMNIBAR"));
-      else if (item.redirect)
-        item.redirect(currentPageId, "OMNIBAR", applicationId);
+      else if (item.redirect) item.redirect(currentPageId, "OMNIBAR");
       dispatch(toggleShowGlobalSearchModal());
     },
   };

@@ -7,6 +7,7 @@ import {
 } from "@appsmith/pages/AdminSettings/config/types";
 
 export const config: AdminConfigType = {
+  icon: "map-pin-2-line",
   type: SettingCategories.GOOGLE_MAPS,
   controlType: SettingTypes.GROUP,
   title: "Google Maps",
@@ -14,14 +15,14 @@ export const config: AdminConfigType = {
   settings: [
     {
       id: "APPSMITH_GOOGLE_MAPS_READ_MORE",
-      category: "google-maps",
+      category: SettingCategories.GOOGLE_MAPS,
       controlType: SettingTypes.LINK,
       label: "How to configure?",
       url: GOOGLE_MAPS_SETUP_DOC,
     },
     {
       id: "APPSMITH_GOOGLE_MAPS_API_KEY",
-      category: "google-maps",
+      category: SettingCategories.GOOGLE_MAPS,
       controlType: SettingTypes.TEXTINPUT,
       controlSubType: SettingSubtype.TEXT,
       label: "Google Maps API Key",

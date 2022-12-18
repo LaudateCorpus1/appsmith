@@ -10,37 +10,41 @@ import {
   toString,
   isBoolean,
   omit,
-  floor,
   isEmpty,
-  isEqual,
 } from "lodash";
 import memoizeOne from "memoize-one";
 import shallowEqual from "shallowequal";
 import WidgetFactory from "utils/WidgetFactory";
 import { removeFalsyEntries } from "utils/helpers";
 import BaseWidget, { WidgetProps, WidgetState } from "widgets/BaseWidget";
-import { RenderModes, WidgetType } from "constants/WidgetConstants";
+import {
+  RenderModes,
+  WidgetType,
+  GridDefaults,
+} from "constants/WidgetConstants";
 import ListComponent, {
   ListComponentEmpty,
   ListComponentLoading,
 } from "../component";
-// import { ContainerStyle } from "components/designSystems/appsmith/ContainerComponent";
-// import { ContainerWidgetProps } from "../ContainerWidget";
-import propertyPaneConfig from "./propertyConfig";
+import {
+  PropertyPaneContentConfig,
+  PropertyPaneStyleConfig,
+} from "./propertyConfig";
 import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
 import { getDynamicBindings } from "utils/DynamicBindingUtils";
 import ListPagination, {
   ServerSideListPagination,
 } from "../component/ListPagination";
-import { GridDefaults, WIDGET_PADDING } from "constants/WidgetConstants";
 import { ValidationTypes } from "constants/WidgetValidation";
 import derivedProperties from "./parseDerivedProperties";
 import { DSLWidget } from "widgets/constants";
 import { entityDefinitions } from "utils/autocomplete/EntityDefinitions";
-import { escapeSpecialChars } from "../../WidgetUtils";
-import { PrivateWidgets } from "entities/DataTree/dataTreeFactory";
+import { PrivateWidgets } from "entities/DataTree/types";
+import equal from "fast-deep-equal/es6";
+import { klona } from "klona/lite";
+import { Stylesheet } from "entities/AppTheming";
 
-const LIST_WIDGEY_PAGINATION_HEIGHT = 36;
+const LIST_WIDGET_PAGINATION_HEIGHT = 36;
 
 /* in the List Widget, "children.0.children.0.children.0.children" is the path to the list of all
   widgets present in the List Widget
@@ -52,11 +56,12 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
     page: 1,
   };
 
-  /**
-   * returns the property pane config of the widget
-   */
-  static getPropertyPaneConfig() {
-    return propertyPaneConfig;
+  static getPropertyPaneContentConfig() {
+    return PropertyPaneContentConfig;
+  }
+
+  static getPropertyPaneStyleConfig() {
+    return PropertyPaneStyleConfig;
   }
 
   static getDerivedPropertiesMap() {
@@ -68,13 +73,21 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
     };
   }
 
+  static getStylesheetConfig(): Stylesheet {
+    return {
+      accentColor: "{{appsmith.theme.colors.primaryColor}}",
+      borderRadius: "{{appsmith.theme.borderRadius.appBorderRadius}}",
+      boxShadow: "{{appsmith.theme.boxShadow.appBoxShadow}}",
+    };
+  }
+
   componentDidMount() {
     if (this.props.serverSidePaginationEnabled && !this.props.pageNo) {
       this.props.updateWidgetMetaProperty("pageNo", 1);
     }
     this.props.updateWidgetMetaProperty(
       "templateBottomRow",
-      get(this.props.children, "0.children.0.bottomRow"),
+      get(this.props.childWidgets, "0.children.0.bottomRow"),
     );
 
     // generate childMetaPropertyMap
@@ -254,12 +267,12 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
     }
 
     if (
-      get(this.props.children, "0.children.0.bottomRow") !==
-      get(prevProps.children, "0.children.0.bottomRow")
+      get(this.props.childWidgets, "0.children.0.bottomRow") !==
+      get(prevProps.childWidgets, "0.children.0.bottomRow")
     ) {
       this.props.updateWidgetMetaProperty(
         "templateBottomRow",
-        get(this.props.children, "0.children.0.bottomRow"),
+        get(this.props.childWidgets, "0.children.0.bottomRow"),
         {
           triggerPropertyName: "onPageSizeChange",
           dynamicString: this.props.onPageSizeChange,
@@ -271,7 +284,7 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
     }
 
     // Update privateWidget field if there is a change in the List widget children
-    if (!isEqual(currentListWidgetChildren, previousListWidgetChildren)) {
+    if (!equal(currentListWidgetChildren, previousListWidgetChildren)) {
       this.addPrivateWidgetsForChildren(this.props);
     }
   }
@@ -288,11 +301,14 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
   }
 
   onPageChange = (page: number) => {
+    const currentPage = this.props.pageNo;
+    const eventType =
+      currentPage > page ? EventType.ON_PREV_PAGE : EventType.ON_NEXT_PAGE;
     this.props.updateWidgetMetaProperty("pageNo", page, {
       triggerPropertyName: "onPageChange",
       dynamicString: this.props.onPageChange,
       event: {
-        type: EventType.ON_LIST_PAGE_CHANGE,
+        type: eventType,
       },
     });
   };
@@ -322,10 +338,10 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
     if (!action) return;
 
     try {
-      const rowData = [this.props.listData?.[rowIndex]] || [];
+      const rowData = this.props.listData?.[rowIndex];
       const { jsSnippets } = getDynamicBindings(action);
       const modifiedAction = jsSnippets.reduce((prev: string, next: string) => {
-        return prev + `{{(currentItem) => { ${next} }}} `;
+        return prev + `{{${next}}} `;
       }, "");
 
       super.executeAction({
@@ -333,7 +349,7 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
         event: {
           type: EventType.ON_CLICK,
         },
-        responseData: rowData,
+        globalContext: { currentItem: rowData },
       });
     } catch (error) {
       log.debug("Error parsing row action", error);
@@ -352,7 +368,7 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
     childWidgetData.rightColumn = componentWidth;
     childWidgetData.noPad = true;
     childWidgetData.bottomRow = shouldPaginate
-      ? componentHeight - LIST_WIDGEY_PAGINATION_HEIGHT
+      ? componentHeight - LIST_WIDGET_PAGINATION_HEIGHT
       : componentHeight;
 
     return WidgetFactory.createWidget(childWidgetData, this.props.renderMode);
@@ -375,6 +391,9 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
         ...child,
         gap,
         backgroundColor: this.props.itemBackgroundColor,
+        borderRadius: this.props.borderRadius,
+        boxShadow: this.props.boxShadow,
+        boxShadowColor: this.props.boxShadowColor,
         topRow:
           index * children[0].bottomRow +
           index * (gap / GridDefaults.DEFAULT_GRID_ROW_HEIGHT),
@@ -420,6 +439,37 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
         ) {
           const evaluatedValue = evaluatedProperty[itemIndex];
           const validationPath = get(widget, `validationPaths`)[path];
+
+          /**
+           * Following conditions are special cases written to support
+           * Dynamic Menu Items (Menu Button Widget) inside the List Widget.
+           *
+           * This is an interim fix since List Widget V2 is just around the corner.
+           *
+           * Here we are simply setting the evaluated value as it is without tampering it.
+           * This is crucial for dynamic menu items to operate in the menu button widget
+           *
+           * The menu button widget decides if the value entered in the property pane is
+           * to be converted and interpreted to as an Array or a Type (boolean and text
+           * being the most used ones). This is done because if someone has used the
+           * {{currentItem}} binding to configure the menu item inside the widget, then the
+           * widget will need an array of evaluated values for the respective menu items.
+           * However, if the {{currentItem}} binding is not used, then we only need one
+           * single value for all menu items.
+           *
+           * Dynamic Menu Items (Menu Button Widget) -
+           * https://github.com/appsmithorg/appsmith/pull/17652
+           */
+          if (
+            (path.includes("configureMenuItems.config") &&
+              validationPath?.type === ValidationTypes.ARRAY_OF_TYPE_OR_TYPE) ||
+            (path === "sourceData" &&
+              validationPath?.type === ValidationTypes.FUNCTION)
+          ) {
+            set(widget, path, evaluatedValue);
+
+            return;
+          }
 
           if (
             (validationPath?.type === ValidationTypes.BOOLEAN &&
@@ -491,15 +541,12 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
           const { jsSnippets } = getDynamicBindings(propertyValue);
           const listItem = this.props.listData?.[itemIndex] || {};
           const stringifiedListItem = JSON.stringify(listItem);
-          const escapedStringifiedListItem = escapeSpecialChars(
-            stringifiedListItem,
-          );
           const newPropertyValue = jsSnippets.reduce(
             (prev: string, next: string) => {
               if (next.indexOf("currentItem") > -1) {
                 return (
                   prev +
-                  `{{((currentItem) => { ${next}})(JSON.parse('${escapedStringifiedListItem}'))}}`
+                  `{{((currentItem) => { ${next}})(JSON.parse(JSON.stringify(${stringifiedListItem})))}}`
                 );
               }
               return prev + `{{${next}}}`;
@@ -517,16 +564,20 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
 
           const newPropertyValue = jsSnippets.reduce(
             (prev: string, next: string) => {
-              if (next.indexOf("currentIndex") > -1) {
+              if (
+                next.indexOf("currentItem") > -1 ||
+                next.indexOf("currentIndex") > -1
+              ) {
                 return (
                   prev +
-                  `{{((currentIndex) => { ${next}})(JSON.parse('${itemIndex}'))}}`
+                  `{{((currentIndex) => { ${next}})(JSON.parse(JSON.stringify(${itemIndex})))}}`
                 );
               }
               return prev + `{{${next}}}`;
             },
             "",
           );
+
           set(widget, path, newPropertyValue);
         }
       });
@@ -549,6 +600,8 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
         `widgetId`,
         `list-widget-child-id-${itemIndex}-${widget.widgetName}`,
       );
+
+      set(widget, `isAutoGeneratedWidget`, true);
 
       if (this.props.renderMode === RenderModes.CANVAS) {
         set(widget, `resizeDisabled`, true);
@@ -643,11 +696,26 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
     return updatedChildren;
   };
 
+  /**
+   * We add a flag here to not fetch the widgets from the canvasWidgets
+   * in the metaHOC base on the widget id. Rather use the props as is.
+   */
+  addFlags = (children: DSLWidget[]) => {
+    return (children || []).map((childWidget) => {
+      childWidget.skipWidgetPropsHydration = true;
+
+      childWidget.children = this.addFlags(childWidget?.children || []);
+
+      return childWidget;
+    });
+  };
+
   updateGridChildrenProps = (children: DSLWidget[]) => {
     let updatedChildren = this.useNewValues(children);
     updatedChildren = this.updateActions(updatedChildren);
     updatedChildren = this.paginateItems(updatedChildren);
     updatedChildren = this.updatePosition(updatedChildren);
+    updatedChildren = this.addFlags(updatedChildren);
 
     return updatedChildren;
   };
@@ -687,13 +755,14 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
    */
   renderChildren = () => {
     if (
-      this.props.children &&
-      this.props.children.length > 0 &&
+      this.props.childWidgets &&
+      this.props.childWidgets.length > 0 &&
       this.props.listData
     ) {
       const { page } = this.state;
-      const children = removeFalsyEntries(this.props.children);
+      const children = removeFalsyEntries(klona(this.props.childWidgets));
       const childCanvas = children[0];
+      const { perPage } = this.shouldPaginate();
 
       const canvasChildren = childCanvas.children;
       const template = canvasChildren.slice(0, 1).shift();
@@ -709,6 +778,7 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
           page,
           gridGap,
           this.props.itemBackgroundColor,
+          perPage,
         );
       } catch (e) {
         log.error(e);
@@ -731,11 +801,12 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       itemBackgroundColor,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      perPage,
     ) => {
       const canvasChildrenList = [];
       if (listData.length > 0) {
         for (let i = 0; i < listData.length; i++) {
-          canvasChildrenList[i] = JSON.parse(JSON.stringify(template));
+          canvasChildrenList[i] = klona(template);
         }
         canvasChildren = this.updateGridChildrenProps(canvasChildrenList);
       } else {
@@ -744,20 +815,22 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
 
       return canvasChildren;
     },
-    (prev: any, next: any) => {
-      // not comparing canvasChildren becuase template acts as a proxy
-
-      return (
-        shallowEqual(prev[0], next[0]) &&
-        shallowEqual(prev[1], next[1]) &&
-        shallowEqual(prev[2], next[2]) &&
-        prev[3] === next[3] &&
-        prev[4] === next[4] &&
-        prev[5] === next[6] &&
-        prev[6] === next[6]
-      );
-    },
+    (prev: any, next: any) => this.compareProps(prev, next),
   );
+
+  // DeepEqual Comparison
+  compareProps = (prev: any[], next: any[]) => {
+    return (
+      equal(prev[0], next[0]) &&
+      shallowEqual(prev[1], next[1]) &&
+      equal(prev[2], next[2]) &&
+      equal(prev[3], next[3]) &&
+      prev[4] === next[4] &&
+      prev[5] === next[5] &&
+      prev[6] === next[6] &&
+      prev[7] === next[7]
+    );
+  };
 
   /**
    * 400
@@ -765,44 +838,19 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
    * can data be paginated
    */
   shouldPaginate = () => {
-    let gridGap = this.getGridGap();
-    const { children, listData, serverSidePaginationEnabled } = this.props;
+    const { listData, pageSize, serverSidePaginationEnabled } = this.props;
 
     if (serverSidePaginationEnabled) {
-      return { shouldPaginate: true, perPage: this.props.pageSize };
+      return { shouldPaginate: true, perPage: pageSize };
     }
 
     if (!listData?.length) {
       return { shouldPaginate: false, perPage: 0 };
     }
-    const { componentHeight } = this.getComponentDimensions();
-    const templateBottomRow = get(children, "0.children.0.bottomRow");
-    const templateHeight =
-      templateBottomRow * GridDefaults.DEFAULT_GRID_ROW_HEIGHT;
 
-    try {
-      gridGap = parseInt(gridGap);
+    const shouldPaginate = pageSize < listData.length;
 
-      if (!isNumber(gridGap) || isNaN(gridGap)) {
-        gridGap = 0;
-      }
-    } catch {
-      gridGap = 0;
-    }
-
-    const shouldPaginate =
-      templateHeight * listData.length +
-        parseInt(gridGap) * (listData.length - 1) >
-      componentHeight;
-
-    const totalSpaceAvailable =
-      componentHeight - (LIST_WIDGEY_PAGINATION_HEIGHT + WIDGET_PADDING * 2);
-    const spaceTakenByOneContainer =
-      templateHeight + (gridGap * (listData.length - 1)) / listData.length;
-
-    const perPage = totalSpaceAvailable / spaceTakenByOneContainer;
-
-    return { shouldPaginate, perPage: isNaN(perPage) ? 0 : floor(perPage) };
+    return { shouldPaginate, perPage: pageSize };
   };
 
   /**
@@ -814,7 +862,7 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
     const { pageNo, serverSidePaginationEnabled } = this.props;
     const { perPage, shouldPaginate } = this.shouldPaginate();
     const templateBottomRow = get(
-      this.props.children,
+      this.props.childWidgets,
       "0.children.0.bottomRow",
     );
     const templateHeight =
@@ -867,6 +915,9 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
     return (
       <ListComponent
         {...this.props}
+        backgroundColor={this.props.backgroundColor}
+        borderRadius={this.props.borderRadius}
+        boxShadow={this.props.boxShadow}
         hasPagination={shouldPaginate}
         key={`list-widget-page-${this.state.page}`}
         listData={this.props.listData || []}
@@ -876,12 +927,19 @@ class ListWidget extends BaseWidget<ListWidgetProps<WidgetProps>, WidgetState> {
         {shouldPaginate &&
           (serverSidePaginationEnabled ? (
             <ServerSideListPagination
+              accentColor={this.props.accentColor}
+              borderRadius={this.props.borderRadius}
+              boxShadow={this.props.boxShadow}
+              disabled={false && this.props.renderMode === RenderModes.CANVAS}
               nextPageClick={() => this.onPageChange(pageNo + 1)}
               pageNo={this.props.pageNo}
               prevPageClick={() => this.onPageChange(pageNo - 1)}
             />
           ) : (
             <ListPagination
+              accentColor={this.props.accentColor}
+              borderRadius={this.props.borderRadius}
+              boxShadow={this.props.boxShadow}
               current={this.state.page}
               disabled={false && this.props.renderMode === RenderModes.CANVAS}
               onChange={(page: number) => this.setState({ page })}
@@ -907,6 +965,10 @@ export interface ListWidgetProps<T extends WidgetProps> extends WidgetProps {
   onListItemClick?: string;
   listData?: Array<Record<string, unknown>>;
   currentItemStructure?: Record<string, string>;
+  backgroundColor: string;
+  borderRadius: string;
+  boxShadow?: string;
+  accentColor: string;
 }
 
 export default ListWidget;

@@ -1,29 +1,29 @@
-import React, { memo, useMemo } from "react";
+import React, { memo, useMemo, useState } from "react";
 import { ControlProps } from "components/formControls/BaseControl";
-import { isHidden } from "components/formControls/utils";
-import { useSelector, shallowEqual } from "react-redux";
-import { getFormValues } from "redux-form";
-import FormControlFactory from "utils/FormControlFactory";
-import Tooltip from "components/ads/Tooltip";
 import {
-  FormLabel,
-  FormInputHelperText,
-  FormInputAnchor,
-  FormInputErrorText,
-  FormInfoText,
-  FormSubtitleText,
-  FormInputSwitchToJsonButton,
-  FormEncrytedSection,
-} from "components/editorComponents/form/fields/StyledFormComponents";
-import { FormIcons } from "icons/FormIcons";
-import { AppState } from "reducers";
+  getViewType,
+  isHidden,
+  ViewTypes,
+} from "components/formControls/utils";
+import { useSelector, shallowEqual, useDispatch } from "react-redux";
+import { getFormValues, change } from "redux-form";
+import FormControlFactory from "utils/formControl/FormControlFactory";
+
+import { AppState } from "@appsmith/reducers";
 import { Action } from "entities/Action";
-import {
-  EvaluationError,
-  PropertyEvaluationErrorType,
-} from "utils/DynamicBindingUtils";
+import { EvaluationError } from "utils/DynamicBindingUtils";
 import { getConfigErrors } from "selectors/formSelectors";
-interface FormControlProps {
+import ToggleComponentToJson from "components/editorComponents/form/ToggleComponentToJson";
+import FormConfig from "./FormConfig";
+import { QUERY_BODY_FIELDS } from "constants/QueryEditorConstants";
+import { convertObjectToQueryParams, getQueryParams } from "utils/URLUtils";
+import { QUERY_EDITOR_FORM_NAME } from "@appsmith/constants/forms";
+import history from "utils/history";
+import TemplateMenu from "pages/Editor/QueryEditor/TemplateMenu";
+import { getAction } from "selectors/entitiesSelector";
+import { get } from "lodash";
+
+export interface FormControlProps {
   config: ControlProps;
   formName: string;
   multipleConfig?: ControlProps[];
@@ -33,7 +33,16 @@ function FormControl(props: FormControlProps) {
   const formValues: Partial<Action> = useSelector((state: AppState) =>
     getFormValues(props.formName)(state),
   );
+  const actionValues = useSelector((state: AppState) =>
+    getAction(state, formValues?.id || ""),
+  );
 
+  const dispatch = useDispatch();
+
+  // adding this to prevent excessive rerendering
+  const [convertFormToRaw, setConvertFormToRaw] = useState(false);
+
+  const viewType = getViewType(formValues, props.config.configProperty);
   const hidden = isHidden(formValues, props.config.hidden);
   const configErrors: EvaluationError[] = useSelector(
     (state: AppState) =>
@@ -44,174 +53,134 @@ function FormControl(props: FormControlProps) {
     shallowEqual,
   );
 
-  const FormConfigMemoizedValue = useMemo(
-    () =>
-      FormControlFactory.createControl(
-        props.config,
-        props.formName,
-        props?.multipleConfig,
-      ),
-    [],
+  // moving creation of template to the formControl layer, this way any formControl created can potentially have a template system.
+  const isNewQuery =
+    new URLSearchParams(window.location.search).get("showTemplate") === "true";
+  const isQueryBodyField = QUERY_BODY_FIELDS.includes(
+    props?.config?.configProperty,
   );
 
-  if (hidden) return null;
+  const showTemplate =
+    isNewQuery && formValues?.datasource?.pluginId && isQueryBodyField;
 
-  return (
-    <FormConfig
-      config={props.config}
-      configErrors={configErrors}
-      formName={props.formName}
-      multipleConfig={props?.multipleConfig}
-    >
-      <div className={`t--form-control-${props.config.controlType}`}>
-        {FormConfigMemoizedValue}
-      </div>
-    </FormConfig>
-  );
-}
-
-interface FormConfigProps extends FormControlProps {
-  children: JSX.Element;
-  configErrors: EvaluationError[];
-}
-// top contains label, subtitle, urltext, tooltip, dispaly type
-// bottom contains the info and error text
-// props.children will render the form element
-function FormConfig(props: FormConfigProps) {
-  let top, bottom;
-
-  if (props.multipleConfig?.length) {
-    top = (
-      <div style={{ display: "flex" }}>
-        {props.multipleConfig?.map((config) => {
-          return renderFormConfigTop({ config });
-        })}
-      </div>
-    );
-    bottom = props.multipleConfig?.map((config) => {
-      return renderFormConfigBottom({ config });
+  const updateQueryParams = () => {
+    const params = getQueryParams();
+    if (params.showTemplate) {
+      params.showTemplate = "false";
+    }
+    history.replace({
+      ...window.location,
+      search: convertObjectToQueryParams(params),
     });
-    return (
-      <>
-        {top}
-        {props.children}
-        {bottom}
-      </>
-    );
+  };
+
+  // if the field is a queryBody field and if the action object is present
+  if (isQueryBodyField && actionValues) {
+    // get the misc data object
+    const miscFormData = actionValues?.actionConfiguration?.formData?.misc;
+    // if the misc data object is available and if the status of the form to raw conversion is successful
+    if (
+      !!miscFormData &&
+      miscFormData?.formToNativeQuery &&
+      miscFormData.formToNativeQuery?.status === "SUCCESS"
+    ) {
+      const configPathValue = get(actionValues, props.config?.configProperty);
+      if (
+        !convertFormToRaw &&
+        typeof configPathValue === "undefined" &&
+        miscFormData.formToNativeQuery?.data
+      ) {
+        setConvertFormToRaw(true);
+        dispatch(
+          change(
+            props?.formName || QUERY_EDITOR_FORM_NAME,
+            props?.config?.configProperty,
+            miscFormData.formToNativeQuery?.data,
+          ),
+        );
+        updateQueryParams();
+      }
+    }
   }
 
-  return (
-    <div>
-      <div
-        style={{
-          // TODO: replace condition with props.config.dataType === "TOGGLE"
-          // label and form element is rendered side by side for CHECKBOX and SWITCH
-          display:
-            props.config.controlType === "SWITCH" ||
-            props.config.controlType === "CHECKBOX"
-              ? "flex"
-              : "block",
-        }}
-      >
-        {props.config.controlType === "CHECKBOX" ? (
-          <>
-            {props.children}
-            {renderFormConfigTop({ config: props.config })}
-          </>
-        ) : (
-          <>
-            {renderFormConfigTop({ config: props.config })}
-            {props.children}
-          </>
-        )}
-      </div>
-      {renderFormConfigBottom({
-        config: props.config,
-        configErrors: props.configErrors,
-      })}
-    </div>
-  );
-}
+  const createTemplate = (
+    template: string,
+    formName: string,
+    configProperty: string,
+  ) => {
+    updateQueryParams();
+    dispatch(
+      change(formName || QUERY_EDITOR_FORM_NAME, configProperty, template),
+    );
+  };
 
-export default memo(FormControl);
+  const FormControlRenderMethod = (config = props.config) => {
+    return FormControlFactory.createControl(
+      config,
+      props.formName,
+      props?.multipleConfig,
+    );
+  };
 
-function renderFormConfigTop(props: { config: ControlProps }) {
-  const {
-    displayType,
-    encrypted,
-    isRequired,
-    label,
-    nestedFormControl,
-    subtitle,
-    tooltipText = "",
-    url,
-    urlText,
-  } = { ...props.config };
-  return (
-    <React.Fragment key={props.config.label}>
-      {!nestedFormControl && ( // if the form control is a nested form control hide its label
-        <FormLabel config={props.config}>
-          <p className="label-icon-wrapper">
-            {label} {isRequired && "*"}{" "}
-            {encrypted && (
-              <FormEncrytedSection>
-                <FormIcons.LOCK_ICON height={12} keepColors width={12} />
-                <FormSubtitleText config={props.config}>
-                  Encrypted
-                </FormSubtitleText>
-              </FormEncrytedSection>
-            )}
-            {tooltipText && (
-              <Tooltip content={tooltipText} hoverOpenDelay={1000}>
-                <FormIcons.HELP_ICON height={16} width={16} />
-              </Tooltip>
-            )}
-          </p>
-          {subtitle && (
-            <FormInfoText config={props.config}>{subtitle}</FormInfoText>
-          )}
-        </FormLabel>
-      )}
-      {urlText && (
-        <FormInputAnchor href={url} target="_blank">
-          {urlText}
-        </FormInputAnchor>
-      )}
-      {displayType && (
-        <FormInputSwitchToJsonButton type="button">
-          {displayType === "JSON" ? "SWITCH TO GUI" : "SWITCH TO JSON EDITOR"}
-        </FormInputSwitchToJsonButton>
-      )}
-    </React.Fragment>
-  );
-}
+  const viewTypes: ViewTypes[] = [];
+  if (
+    "alternateViewTypes" in props.config &&
+    Array.isArray(props.config.alternateViewTypes)
+  ) {
+    viewTypes.push(...props.config.alternateViewTypes);
+  }
 
-function renderFormConfigBottom(props: {
-  config: ControlProps;
-  configErrors?: EvaluationError[];
-}) {
-  const { controlType, info } = { ...props.config };
-  return (
-    <>
-      {info && (
-        <FormInputHelperText
-          addMarginTop={controlType === "CHECKBOX" ? "8px" : "2px"} // checkboxes need a higher margin top than others form control types
+  return useMemo(
+    () =>
+      !hidden ? (
+        <FormConfig
+          changesViewType={
+            !!(viewTypes.length > 0 && viewTypes.includes(ViewTypes.JSON))
+          }
+          config={props.config}
+          configErrors={configErrors}
+          formName={props.formName}
+          multipleConfig={props?.multipleConfig}
         >
-          {info}
-        </FormInputHelperText>
-      )}
-      {props.configErrors &&
-        props.configErrors.length > 0 &&
-        props.configErrors
-          .filter(
-            (error) =>
-              error.errorType === PropertyEvaluationErrorType.VALIDATION,
-          )
-          .map((error, index) => (
-            <FormInputErrorText key={index}>
-              {`* ${error?.errorMessage}`}
-            </FormInputErrorText>
-          ))}
-    </>
+          <div
+            className={`t--form-control-${props.config.controlType}`}
+            data-replay-id={btoa(props.config.configProperty)}
+          >
+            {showTemplate && !convertFormToRaw ? (
+              <TemplateMenu
+                createTemplate={(templateString: string) =>
+                  createTemplate(
+                    templateString,
+                    props?.formName,
+                    props?.config?.configProperty,
+                  )
+                }
+                pluginId={formValues?.datasource?.pluginId || ""}
+              />
+            ) : viewTypes.length > 0 && viewTypes.includes(ViewTypes.JSON) ? (
+              <ToggleComponentToJson
+                componentControlType={props.config.controlType}
+                configProperty={props.config.configProperty}
+                customStyles={props?.config?.customStyles}
+                disabled={props.config.disabled}
+                formName={props.formName}
+                renderCompFunction={FormControlRenderMethod}
+                viewType={viewType}
+              />
+            ) : (
+              FormControlRenderMethod()
+            )}
+          </div>
+        </FormConfig>
+      ) : null,
+    [props],
   );
 }
+
+// Updated the memo function to allow for disabled props to be compared
+export default memo(FormControl, (prevProps, nextProps) => {
+  return (
+    prevProps === nextProps &&
+    prevProps.config.disabled === nextProps.config.disabled
+  );
+});

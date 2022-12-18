@@ -1,20 +1,24 @@
-import React from "react";
-import { pick } from "lodash";
-import WidgetStyleContainer, {
-  WidgetStyleContainerProps,
-} from "components/designSystems/appsmith/WidgetStyleContainer";
+import React, { ReactNode } from "react";
 
 import { TextSize } from "constants/WidgetConstants";
+import { countOccurrences } from "workers/Evaluation/helpers";
 
 import { ValidationTypes } from "constants/WidgetValidation";
 import { DerivedPropertiesMap } from "utils/WidgetFactory";
 
+import { Color } from "constants/Colors";
 import BaseWidget, { WidgetProps, WidgetState } from "widgets/BaseWidget";
 import TextComponent, { TextAlign } from "../component";
-import { AutocompleteDataType } from "utils/autocomplete/TernServer";
+import { ContainerStyle } from "widgets/ContainerWidget/component";
+import { AutocompleteDataType } from "utils/autocomplete/CodemirrorTernService";
+import { OverflowTypes } from "../constants";
+import WidgetStyleContainer from "components/designSystems/appsmith/WidgetStyleContainer";
+import { pick } from "lodash";
+import { Stylesheet } from "entities/AppTheming";
 
+const MAX_HTML_PARSING_LENGTH = 1000;
 class TextWidget extends BaseWidget<TextWidgetProps, WidgetState> {
-  static getPropertyPaneConfig() {
+  static getPropertyPaneContentConfig() {
     return [
       {
         sectionName: "General",
@@ -27,21 +31,32 @@ class TextWidget extends BaseWidget<TextWidgetProps, WidgetState> {
             placeholderText: "Name:",
             isBindProperty: true,
             isTriggerProperty: false,
-            validation: { type: ValidationTypes.TEXT },
+            validation: {
+              type: ValidationTypes.TEXT,
+              params: { limitLineBreaks: true },
+            },
           },
           {
-            propertyName: "shouldScroll",
-            label: "Enable Scroll",
-            helpText: "Allows scrolling text instead of truncation",
-            controlType: "SWITCH",
-            isBindProperty: false,
-            isTriggerProperty: false,
-          },
-          {
-            propertyName: "shouldTruncate",
-            label: "Truncate Text",
-            helpText: "Set truncate text",
-            controlType: "SWITCH",
+            propertyName: "overflow",
+            label: "Overflow Text",
+            helpText: "Controls the text behavior when length of text exceeds",
+            controlType: "ICON_TABS",
+            fullWidth: true,
+            options: [
+              {
+                label: "Scroll",
+                value: OverflowTypes.SCROLL,
+              },
+              {
+                label: "Truncate",
+                value: OverflowTypes.TRUNCATE,
+              },
+              {
+                label: "None",
+                value: OverflowTypes.NONE,
+              },
+            ],
+            defaultValue: OverflowTypes.NONE,
             isBindProperty: false,
             isTriggerProperty: false,
           },
@@ -78,12 +93,146 @@ class TextWidget extends BaseWidget<TextWidgetProps, WidgetState> {
           },
         ],
       },
+    ];
+  }
+
+  static getStylesheetConfig(): Stylesheet {
+    return {
+      truncateButtonColor: "{{appsmith.theme.colors.primaryColor}}",
+      fontFamily: "{{appsmith.theme.fontFamily.appFont}}",
+      borderRadius: "{{appsmith.theme.borderRadius.appBorderRadius}}",
+    };
+  }
+
+  static getPropertyPaneStyleConfig() {
+    return [
       {
-        sectionName: "Styles",
+        sectionName: "General",
         children: [
           {
+            propertyName: "fontFamily",
+            label: "Font Family",
+            helpText: "Controls the font family being used",
+            controlType: "DROP_DOWN",
+            options: [
+              {
+                label: "System Default",
+                value: "System Default",
+              },
+              {
+                label: "Nunito Sans",
+                value: "Nunito Sans",
+              },
+              {
+                label: "Poppins",
+                value: "Poppins",
+              },
+              {
+                label: "Inter",
+                value: "Inter",
+              },
+              {
+                label: "Montserrat",
+                value: "Montserrat",
+              },
+              {
+                label: "Noto Sans",
+                value: "Noto Sans",
+              },
+              {
+                label: "Open Sans",
+                value: "Open Sans",
+              },
+              {
+                label: "Roboto",
+                value: "Roboto",
+              },
+              {
+                label: "Rubik",
+                value: "Rubik",
+              },
+              {
+                label: "Ubuntu",
+                value: "Ubuntu",
+              },
+            ],
+            defaultValue: "System Default",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: {
+              type: ValidationTypes.TEXT,
+            },
+          },
+          {
+            propertyName: "fontSize",
+            label: "Font Size",
+            helpText: "Controls the size of the font used",
+            controlType: "DROP_DOWN",
+            defaultValue: "1rem",
+            options: [
+              {
+                label: "S",
+                value: "0.875rem",
+                subText: "0.875rem",
+              },
+              {
+                label: "M",
+                value: "1rem",
+                subText: "1rem",
+              },
+              {
+                label: "L",
+                value: "1.25rem",
+                subText: "1.25rem",
+              },
+              {
+                label: "XL",
+                value: "1.875rem",
+                subText: "1.875rem",
+              },
+              {
+                label: "XXL",
+                value: "3rem",
+                subText: "3rem",
+              },
+              {
+                label: "3XL",
+                value: "3.75rem",
+                subText: "3.75rem",
+              },
+            ],
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: {
+              type: ValidationTypes.TEXT,
+            },
+          },
+        ],
+      },
+      {
+        sectionName: "Color",
+        children: [
+          {
+            propertyName: "textColor",
+            label: "Text Color",
+            helpText: "Controls the color of the text displayed",
+            controlType: "COLOR_PICKER",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: {
+              type: ValidationTypes.TEXT,
+              params: {
+                regex: /^(?![<|{{]).+/,
+              },
+            },
+          },
+          {
             propertyName: "backgroundColor",
-            label: "Cell Background Color",
+            label: "Background Color",
+            helpText: "Background color of the text added",
             controlType: "COLOR_PICKER",
             isJSConvertible: true,
             isBindProperty: true,
@@ -101,38 +250,6 @@ class TextWidget extends BaseWidget<TextWidgetProps, WidgetState> {
             },
           },
           {
-            propertyName: "textColor",
-            label: "Text Color",
-            controlType: "COLOR_PICKER",
-            isJSConvertible: true,
-            isBindProperty: true,
-            isTriggerProperty: false,
-            validation: {
-              type: ValidationTypes.TEXT,
-              params: {
-                regex: /^(?![<|{{]).+/,
-              },
-            },
-          },
-          {
-            propertyName: "truncateButtonColor",
-            label: "Truncate Button Color",
-            controlType: "COLOR_PICKER",
-            isJSConvertible: true,
-            isBindProperty: true,
-            isTriggerProperty: false,
-            validation: {
-              type: ValidationTypes.TEXT,
-              params: {
-                regex: /^(?![<|{{]).+/,
-              },
-            },
-            dependencies: ["shouldTruncate"],
-            hidden: (props: TextWidgetProps) => {
-              return !props.shouldTruncate;
-            },
-          },
-          {
             helpText: "Use a html color name, HEX, RGB or RGBA value",
             placeholderText: "#FFFFFF / Gray / rgb(255, 99, 71)",
             propertyName: "borderColor",
@@ -143,91 +260,35 @@ class TextWidget extends BaseWidget<TextWidgetProps, WidgetState> {
             validation: { type: ValidationTypes.TEXT },
           },
           {
-            helpText:
-              "Enter value for border width which can also use as margin",
-            propertyName: "borderWidth",
-            label: "Border Width",
-            placeholderText: "Enter value in px",
-            controlType: "INPUT_TEXT",
-            isBindProperty: true,
-            isTriggerProperty: false,
-            validation: { type: ValidationTypes.NUMBER },
-          },
-          {
-            propertyName: "fontSize",
-            label: "Text Size",
-            controlType: "DROP_DOWN",
-            options: [
-              {
-                label: "Heading 1",
-                value: "HEADING1",
-                subText: "24px",
-                icon: "HEADING_ONE",
-              },
-              {
-                label: "Heading 2",
-                value: "HEADING2",
-                subText: "18px",
-                icon: "HEADING_TWO",
-              },
-              {
-                label: "Heading 3",
-                value: "HEADING3",
-                subText: "16px",
-                icon: "HEADING_THREE",
-              },
-              {
-                label: "Paragraph",
-                value: "PARAGRAPH",
-                subText: "14px",
-                icon: "PARAGRAPH",
-              },
-              {
-                label: "Paragraph 2",
-                value: "PARAGRAPH2",
-                subText: "12px",
-                icon: "PARAGRAPH_TWO",
-              },
-            ],
+            propertyName: "truncateButtonColor",
+            label: "Truncate Button Color",
+            helpText: "Controls the color of the truncate button",
+            controlType: "COLOR_PICKER",
             isJSConvertible: true,
             isBindProperty: true,
             isTriggerProperty: false,
             validation: {
               type: ValidationTypes.TEXT,
               params: {
-                allowedValues: [
-                  "HEADING1",
-                  "HEADING2",
-                  "HEADING3",
-                  "PARAGRAPH",
-                  "PARAGRAPH2",
-                ],
+                regex: /^((?![<|{{]).+){0,1}/,
               },
             },
+            dependencies: ["overflow"],
+            hidden: (props: TextWidgetProps) => {
+              return props.overflow !== OverflowTypes.TRUNCATE;
+            },
           },
-          {
-            propertyName: "fontStyle",
-            label: "Font Style",
-            controlType: "BUTTON_TABS",
-            options: [
-              {
-                icon: "BOLD_FONT",
-                value: "BOLD",
-              },
-              {
-                icon: "ITALICS_FONT",
-                value: "ITALIC",
-              },
-            ],
-            isJSConvertible: true,
-            isBindProperty: true,
-            isTriggerProperty: false,
-            validation: { type: ValidationTypes.TEXT },
-          },
+        ],
+      },
+      {
+        sectionName: "Text Formatting",
+        children: [
           {
             propertyName: "textAlign",
-            label: "Text Align",
+            label: "Alignment",
+            helpText: "Controls the horizontal alignment of the text",
             controlType: "ICON_TABS",
+            fullWidth: true,
             options: [
               {
                 icon: "LEFT_ALIGN",
@@ -248,14 +309,67 @@ class TextWidget extends BaseWidget<TextWidgetProps, WidgetState> {
             isTriggerProperty: false,
             validation: { type: ValidationTypes.TEXT },
           },
+          {
+            propertyName: "fontStyle",
+            label: "Emphasis",
+            helpText: "Controls the font emphasis of the text displayed",
+            controlType: "BUTTON_TABS",
+            options: [
+              {
+                icon: "BOLD_FONT",
+                value: "BOLD",
+              },
+              {
+                icon: "ITALICS_FONT",
+                value: "ITALIC",
+              },
+            ],
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+        ],
+      },
+      {
+        sectionName: "Border and Shadow",
+        children: [
+          {
+            helpText:
+              "Enter value for border width which can also use as margin",
+            propertyName: "borderWidth",
+            label: "Border Width",
+            placeholderText: "Enter value in px",
+            controlType: "INPUT_TEXT",
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.NUMBER },
+          },
         ],
       },
     ];
   }
 
+  /**
+   * Disable html parsing for long continuous texts
+   * @returns boolean
+   */
+  shouldDisableLink = (): boolean => {
+    const text = this.props.text || "";
+    const count: number = countOccurrences(text, "\n", false, 0);
+    return (
+      (count === 0 && text.length > MAX_HTML_PARSING_LENGTH) ||
+      text.length > 50000
+    );
+  };
+
   getPageView() {
+    const disableLink: boolean = this.props.disableLink
+      ? true
+      : this.shouldDisableLink();
     return (
       <WidgetStyleContainer
+        className="t--text-widget-container"
         {...pick(this.props, [
           "widgetId",
           "containerStyle",
@@ -264,22 +378,25 @@ class TextWidget extends BaseWidget<TextWidgetProps, WidgetState> {
         ])}
       >
         <TextComponent
+          accentColor={this.props.accentColor}
           backgroundColor={this.props.backgroundColor}
           bottomRow={this.props.bottomRow}
-          disableLink={this.props.disableLink || false}
+          disableLink={disableLink}
+          fontFamily={this.props.fontFamily}
           fontSize={this.props.fontSize}
           fontStyle={this.props.fontStyle}
           isLoading={this.props.isLoading}
           key={this.props.widgetId}
           leftColumn={this.props.leftColumn}
+          overflow={this.props.overflow}
           rightColumn={this.props.rightColumn}
-          shouldScroll={this.props.shouldScroll}
-          shouldTruncate={this.props.shouldTruncate}
           text={this.props.text}
           textAlign={this.props.textAlign ? this.props.textAlign : "LEFT"}
           textColor={this.props.textColor}
           topRow={this.props.topRow}
-          truncateButtonColor={this.props.truncateButtonColor}
+          truncateButtonColor={
+            this.props.truncateButtonColor || this.props.accentColor
+          }
           widgetId={this.props.widgetId}
         />
       </WidgetStyleContainer>
@@ -304,17 +421,20 @@ export interface TextStyles {
   fontSize?: TextSize;
   textAlign?: TextAlign;
   truncateButtonColor?: string;
+  fontFamily: string;
 }
 
-export interface TextWidgetProps
-  extends WidgetProps,
-    TextStyles,
-    WidgetStyleContainerProps {
+export interface TextWidgetProps extends WidgetProps, TextStyles {
+  accentColor: string;
   text?: string;
   isLoading: boolean;
-  shouldScroll: boolean;
-  shouldTruncate: boolean;
   disableLink: boolean;
+  widgetId: string;
+  containerStyle?: ContainerStyle;
+  children?: ReactNode;
+  borderColor?: Color;
+  borderWidth?: number;
+  overflow: OverflowTypes;
 }
 
 export default TextWidget;

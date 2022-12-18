@@ -7,12 +7,9 @@ import { IconName } from "@blueprintjs/icons";
 
 import { Theme } from "constants/DefaultTheme";
 
-import { ThemeProp } from "components/ads/common";
-
 import _ from "lodash";
 import {
   ButtonStyleTypes,
-  ButtonBoxShadow,
   ButtonBoxShadowTypes,
   ButtonBorderRadius,
   ButtonBorderRadiusTypes,
@@ -20,6 +17,7 @@ import {
   ButtonVariant,
   ButtonVariantTypes,
 } from "components/constants";
+import { ThemeProp } from "widgets/constants";
 
 const getCustomTextColor = (
   theme: Theme,
@@ -279,8 +277,7 @@ type ButtonStyleProps = {
   buttonStyle?: ButtonStyleType;
   prevButtonStyle?: ButtonStyleType;
   buttonVariant?: ButtonVariant;
-  boxShadow?: ButtonBoxShadow;
-  boxShadowColor?: string;
+  boxShadow?: string;
   borderRadius?: ButtonBorderRadius;
   iconName?: IconName;
   iconAlign?: Alignment;
@@ -291,7 +288,6 @@ export function BaseButton(props: IButtonProps & ButtonStyleProps) {
   const {
     borderRadius,
     boxShadow,
-    boxShadowColor,
     buttonColor,
     buttonStyle,
     buttonVariant,
@@ -313,7 +309,6 @@ export function BaseButton(props: IButtonProps & ButtonStyleProps) {
         alignText={iconName ? Alignment.LEFT : Alignment.CENTER}
         borderRadius={borderRadius}
         boxShadow={boxShadow}
-        boxShadowColor={boxShadowColor}
         buttonColor={buttonColor}
         buttonStyle={buttonStyle}
         buttonVariant={buttonVariant}
@@ -335,7 +330,6 @@ export function BaseButton(props: IButtonProps & ButtonStyleProps) {
       alignText={iconName ? Alignment.RIGHT : Alignment.CENTER}
       borderRadius={borderRadius}
       boxShadow={boxShadow}
-      boxShadowColor={boxShadowColor}
       buttonColor={buttonColor}
       buttonStyle={buttonStyle}
       buttonVariant={buttonVariant}

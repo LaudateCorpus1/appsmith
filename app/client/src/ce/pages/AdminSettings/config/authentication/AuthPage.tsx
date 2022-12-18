@@ -1,8 +1,7 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { useHistory } from "react-router-dom";
 import { SettingCategories } from "../types";
 import styled from "styled-components";
-import Button, { Category } from "components/ads/Button";
 import {
   ENABLE,
   ADMIN_AUTH_SETTINGS_SUBTITLE,
@@ -11,36 +10,32 @@ import {
   EDIT,
   UPGRADE,
   UPGRADE_TO_EE,
+  AUTHENTICATION_METHOD_ENABLED,
 } from "@appsmith/constants/messages";
-import { getAdminSettingsCategoryUrl } from "constants/routes";
-import { Callout, CalloutType } from "components/ads/CalloutV2";
-import { getAppsmithConfigs } from "@appsmith/configs";
-import { getCurrentUser } from "selectors/usersSelectors";
-import { useSelector } from "react-redux";
-import { bootIntercom } from "utils/helpers";
+import { CalloutV2, CalloutType } from "design-system";
 import { Colors } from "constants/Colors";
-import Icon from "components/ads/Icon";
+import { Button, Category, Icon, TooltipComponent } from "design-system";
+import { adminSettingsCategoryUrl } from "RouteBuilder";
+import AnalyticsUtil from "utils/AnalyticsUtil";
+import useOnUpgrade from "utils/hooks/useOnUpgrade";
 
-const { intercomAppID } = getAppsmithConfigs();
-
-const Wrapper = styled.div`
+export const Wrapper = styled.div`
   flex-basis: calc(100% - ${(props) => props.theme.homePage.leftPane.width}px);
-  margin-left: 112px;
-  padding-top: 40px;
+  padding: 40px 0 0 24px;
   height: calc(100vh - ${(props) => props.theme.homePage.header}px);
   overflow: auto;
 `;
 
-const SettingsFormWrapper = styled.div``;
+export const SettingsFormWrapper = styled.div``;
 
-const SettingsHeader = styled.h2`
+export const SettingsHeader = styled.h2`
   font-size: 24px;
   font-weight: 500;
   text-transform: capitalize;
   margin-bottom: 0;
 `;
 
-const SettingsSubHeader = styled.div`
+export const SettingsSubHeader = styled.div`
   font-size: 14px;
   margin-bottom: 0;
 `;
@@ -112,37 +107,54 @@ const StyledAuthButton = styled(Button)`
   padding: 8px 16px;
 `;
 
-const Label = styled.span<{ enterprise?: boolean }>`
+const Label = styled.span<{ business?: boolean }>`
   display: inline;
   ${(props) =>
-    props.enterprise
+    props.business
       ? `
     border: 1px solid ${Colors.COD_GRAY};
     color: ${Colors.COD_GRAY};
     background: #fff;
   `
       : `
-    color: #03B365;
+    color: ${Colors.GREEN};
     background: #E5F6EC;
   `};
   padding: 0px 4px;
   font-size: 12px;
 `;
 
+export function Upgrade(message: string, method: string) {
+  const { onUpgrade } = useOnUpgrade({
+    logEventName: "ADMIN_SETTINGS_UPGRADE_AUTH_METHOD",
+    logEventData: { method },
+    intercomMessage: message,
+  });
+
+  return onUpgrade();
+}
+
 export function AuthPage({ authMethods }: { authMethods: AuthMethodType[] }) {
   const history = useHistory();
-  const user = useSelector(getCurrentUser);
 
-  useEffect(() => {
-    bootIntercom(user);
-  }, [user?.email]);
-
-  const triggerIntercom = (authLabel: string) => {
-    if (intercomAppID && window.Intercom) {
-      window.Intercom(
-        "showNewMessage",
-        createMessage(UPGRADE_TO_EE, authLabel),
+  const onClickHandler = (method: AuthMethodType) => {
+    if (!method.needsUpgrade || method.isConnected) {
+      AnalyticsUtil.logEvent(
+        method.isConnected
+          ? "ADMIN_SETTINGS_EDIT_AUTH_METHOD"
+          : "ADMIN_SETTINGS_ENABLE_AUTH_METHOD",
+        {
+          method: method.label,
+        },
       );
+      history.push(
+        adminSettingsCategoryUrl({
+          category: SettingCategories.AUTHENTICATION,
+          selected: method.category,
+        }),
+      );
+    } else {
+      Upgrade(createMessage(UPGRADE_TO_EE, method.label), method.label);
     }
   };
 
@@ -165,19 +177,35 @@ export function AuthPage({ authMethods }: { authMethods: AuthMethodType[] }) {
                     {method.label}&nbsp;
                     {method.needsUpgrade && (
                       <>
-                        <Label enterprise>Enterprise</Label>
+                        <Label business>Business</Label>
                         &nbsp;
                       </>
                     )}
                     {method.isConnected && (
-                      <Icon fillColor="#03B365" name="oval-check" />
+                      <TooltipComponent
+                        autoFocus={false}
+                        content={createMessage(
+                          AUTHENTICATION_METHOD_ENABLED,
+                          method.label,
+                        )}
+                        hoverOpenDelay={0}
+                        minWidth={"180px"}
+                        openOnTargetFocus={false}
+                        position="right"
+                      >
+                        <Icon
+                          className={`${method.category}-green-check`}
+                          fillColor={Colors.GREEN}
+                          name="oval-check"
+                        />
+                      </TooltipComponent>
                     )}
                   </MethodTitle>
                   <MethodDets>{method.subText}</MethodDets>
                   {method.calloutBanner && (
-                    <Callout
+                    <CalloutV2
                       actionLabel={method.calloutBanner.actionLabel}
-                      title={method.calloutBanner.title}
+                      desc={method.calloutBanner.title}
                       type={method.calloutBanner.type}
                     />
                   )}
@@ -187,19 +215,12 @@ export function AuthPage({ authMethods }: { authMethods: AuthMethodType[] }) {
                     method.isConnected ? Category.primary : Category.tertiary
                   }
                   className={`t--settings-sub-category-${
-                    method.needsUpgrade ? "upgrade" : method.category
+                    method.needsUpgrade
+                      ? `upgrade-${method.category}`
+                      : method.category
                   }`}
                   data-cy="btn-auth-account"
-                  onClick={() =>
-                    !method.needsUpgrade || method.isConnected
-                      ? history.push(
-                          getAdminSettingsCategoryUrl(
-                            SettingCategories.AUTHENTICATION,
-                            method.category,
-                          ),
-                        )
-                      : triggerIntercom(method.label)
-                  }
+                  onClick={() => onClickHandler(method)}
                   text={createMessage(
                     method.isConnected
                       ? EDIT

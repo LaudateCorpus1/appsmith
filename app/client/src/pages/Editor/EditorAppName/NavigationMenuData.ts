@@ -1,68 +1,37 @@
 import { useDispatch, useSelector } from "react-redux";
-import { useHistory, useParams } from "react-router-dom";
+import { useHistory } from "react-router-dom";
 import { noop } from "lodash";
 
-import { Variant } from "components/ads/common";
-import { Toaster } from "components/ads/Toast";
-import { ThemeProp } from "components/ads/common";
-import {
-  setCommentModeInUrl,
-  useHideComments,
-} from "pages/Editor/ToggleModeButton";
-import { ReduxActionTypes } from "constants/ReduxActionConstants";
-import { APPLICATIONS_URL, PAGE_LIST_EDITOR_URL } from "constants/routes";
+import { Toaster, Variant } from "design-system";
+import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import { APPLICATIONS_URL } from "constants/routes";
 
 import { MenuItemData, MenuTypes } from "./NavigationMenuItem";
 import { useCallback } from "react";
-import { ExplorerURLParams } from "../Explorer/helpers";
 import { getExportAppAPIRoute } from "@appsmith/constants/ApiConstants";
 
 import {
+  hasDeleteApplicationPermission,
   isPermitted,
   PERMISSION_TYPE,
-} from "../../Applications/permissionHelpers";
+} from "@appsmith/utils/permissionHelpers";
 import { getCurrentApplication } from "selectors/applicationSelectors";
 import { Colors } from "constants/Colors";
-import getFeatureFlags from "utils/featureFlags";
-import { setIsGitSyncModalOpen } from "actions/gitSyncActions";
-import { GitSyncModalTab } from "entities/GitSync";
-import { getIsGitConnected } from "selectors/gitSyncSelectors";
-import {
-  createMessage,
-  DEPLOY_MENU_OPTION,
-  CONNECT_TO_GIT_OPTION,
-  CURRENT_DEPLOY_PREVIEW_OPTION,
-} from "@appsmith/constants/messages";
 import { getCurrentApplicationId } from "selectors/editorSelectors";
 import { redoAction, undoAction } from "actions/pageActions";
 import { redoShortCut, undoShortCut } from "utils/helpers";
+import { openAppSettingsPaneAction } from "actions/appSettingsPaneActions";
+import { ThemeProp } from "widgets/constants";
 
 type NavigationMenuDataProps = ThemeProp & {
   editMode: typeof noop;
-  deploy: typeof noop;
-  currentDeployLink: string;
 };
 
 export const GetNavigationMenuData = ({
-  currentDeployLink,
-  deploy,
   editMode,
 }: NavigationMenuDataProps): MenuItemData[] => {
   const dispatch = useDispatch();
-
-  const isHideComments = useHideComments();
   const history = useHistory();
-  const params = useParams<ExplorerURLParams>();
-
-  const isGitConnected = useSelector(getIsGitConnected);
-
-  const openGitConnectionPopup = () =>
-    dispatch(
-      setIsGitSyncModalOpen({
-        isOpen: true,
-        tab: GitSyncModalTab.GIT_CONNECTION,
-      }),
-    );
 
   const applicationId = useSelector(getCurrentApplicationId);
 
@@ -78,6 +47,8 @@ export const GetNavigationMenuData = ({
       window.open(link, "_blank");
     }
   }, []);
+
+  const openAppSettingsPane = () => dispatch(openAppSettingsPaneAction());
 
   const deleteApplication = () => {
     if (applicationId && applicationId.length > 0) {
@@ -96,34 +67,18 @@ export const GetNavigationMenuData = ({
     }
   };
 
-  const deployOptions = [
-    {
-      text: createMessage(DEPLOY_MENU_OPTION),
-      onClick: deploy,
-      type: MenuTypes.MENU,
-      isVisible: true,
-      isOpensNewWindow: true,
-    },
-    {
-      text: createMessage(CURRENT_DEPLOY_PREVIEW_OPTION),
-      onClick: () => openExternalLink(currentDeployLink),
-      type: MenuTypes.MENU,
-      isVisible: true,
-      isOpensNewWindow: true,
-    },
-  ];
-
-  if (getFeatureFlags().GIT && !isGitConnected) {
-    deployOptions.push({
-      text: createMessage(CONNECT_TO_GIT_OPTION),
-      onClick: () => openGitConnectionPopup(),
-      type: MenuTypes.MENU,
-      isVisible: true,
-      isOpensNewWindow: false,
-    });
-  }
-
   return [
+    {
+      text: "Home",
+      onClick: () => history.replace(APPLICATIONS_URL),
+      type: MenuTypes.MENU,
+      isVisible: true,
+    },
+    {
+      text: "divider_1",
+      type: MenuTypes.MENU_DIVIDER,
+      isVisible: true,
+    },
     {
       text: "Edit Name",
       onClick: editMode,
@@ -152,39 +107,10 @@ export const GetNavigationMenuData = ({
       ],
     },
     {
-      text: "Pages",
-      onClick: () => {
-        history.push(PAGE_LIST_EDITOR_URL(applicationId, params.pageId));
-      },
+      text: "Settings",
+      onClick: openAppSettingsPane,
       type: MenuTypes.MENU,
       isVisible: true,
-    },
-    {
-      text: "View Modes",
-      type: MenuTypes.PARENT,
-      isVisible: !isHideComments,
-      children: [
-        {
-          text: "Edit Mode",
-          label: "V",
-          onClick: () => setCommentModeInUrl(false),
-          type: MenuTypes.MENU,
-          isVisible: true,
-        },
-        {
-          text: "Comment Mode",
-          label: "C",
-          onClick: () => setCommentModeInUrl(true),
-          type: MenuTypes.MENU,
-          isVisible: true,
-        },
-      ],
-    },
-    {
-      text: "Deploy",
-      type: MenuTypes.PARENT,
-      isVisible: true,
-      children: deployOptions,
     },
     {
       text: "Help",
@@ -229,7 +155,7 @@ export const GetNavigationMenuData = ({
       type: MenuTypes.MENU,
       isVisible: isApplicationIdPresent && hasExportPermission,
     },
-    {
+    hasDeleteApplicationPermission(currentApplication?.userPermissions) && {
       text: "Delete Application",
       confirmText: "Are you sure?",
       onClick: deleteApplication,
@@ -237,5 +163,5 @@ export const GetNavigationMenuData = ({
       isVisible: isApplicationIdPresent,
       style: { color: Colors.ERROR_RED },
     },
-  ];
+  ].filter(Boolean) as MenuItemData[];
 };

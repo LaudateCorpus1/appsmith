@@ -4,11 +4,13 @@ import { ValidationTypes } from "constants/WidgetValidation";
 import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
 import IframeComponent from "../component";
 import { IframeWidgetProps } from "../constants";
+import { Stylesheet } from "entities/AppTheming";
+
 class IframeWidget extends BaseWidget<IframeWidgetProps, WidgetState> {
-  static getPropertyPaneConfig() {
+  static getPropertyPaneContentConfig() {
     return [
       {
-        sectionName: "General",
+        sectionName: "Data",
         children: [
           {
             propertyName: "source",
@@ -37,6 +39,11 @@ class IframeWidget extends BaseWidget<IframeWidgetProps, WidgetState> {
               type: ValidationTypes.TEXT,
             },
           },
+        ],
+      },
+      {
+        sectionName: "General",
+        children: [
           {
             propertyName: "title",
             helpText: "Label the content of the page to embed",
@@ -92,19 +99,46 @@ class IframeWidget extends BaseWidget<IframeWidgetProps, WidgetState> {
           },
         ],
       },
+    ];
+  }
+
+  static getPropertyPaneStyleConfig() {
+    return [
       {
-        sectionName: "Styles",
+        sectionName: "Color",
         children: [
           {
             propertyName: "borderColor",
             label: "Border Color",
+            helpText: "Controls the color of the border",
             controlType: "COLOR_PICKER",
-            isBindProperty: false,
+            isJSConvertible: true,
+            isBindProperty: true,
             isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+        ],
+      },
+      {
+        sectionName: "Border and Shadow",
+        children: [
+          {
+            propertyName: "borderWidth",
+            label: "Border Width (px)",
+            helpText: "Controls the size of the border in px",
+            controlType: "INPUT_TEXT",
+            isBindProperty: true,
+            isTriggerProperty: false,
+            inputType: "NUMBER",
+            validation: {
+              type: ValidationTypes.NUMBER,
+              params: { min: 0, default: 1 },
+            },
           },
           {
             propertyName: "borderOpacity",
             label: "Border Opacity (%)",
+            helpText: "Controls the opacity of the border in percentage",
             controlType: "INPUT_TEXT",
             isBindProperty: true,
             isTriggerProperty: false,
@@ -115,16 +149,26 @@ class IframeWidget extends BaseWidget<IframeWidgetProps, WidgetState> {
             },
           },
           {
-            propertyName: "borderWidth",
-            label: "Border Width (px)",
-            controlType: "INPUT_TEXT",
+            propertyName: "borderRadius",
+            label: "Border Radius",
+            helpText:
+              "Rounds the corners of the icon button's outer border edge",
+            controlType: "BORDER_RADIUS_OPTIONS",
+            isJSConvertible: true,
             isBindProperty: true,
             isTriggerProperty: false,
-            inputType: "NUMBER",
-            validation: {
-              type: ValidationTypes.NUMBER,
-              params: { min: 0, default: 1 },
-            },
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            propertyName: "boxShadow",
+            label: "Box Shadow",
+            helpText:
+              "Enables you to cast a drop shadow from the frame of the widget",
+            controlType: "BOX_SHADOW_OPTIONS",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
           },
         ],
       },
@@ -134,6 +178,14 @@ class IframeWidget extends BaseWidget<IframeWidgetProps, WidgetState> {
   static getMetaPropertiesMap(): Record<string, any> {
     return {
       message: undefined,
+      messageMetadata: undefined,
+    };
+  }
+
+  static getStylesheetConfig(): Stylesheet {
+    return {
+      borderRadius: "{{appsmith.theme.borderRadius.appBorderRadius}}",
+      boxShadow: "{{appsmith.theme.boxShadow.appBoxShadow}}",
     };
   }
 
@@ -161,13 +213,18 @@ class IframeWidget extends BaseWidget<IframeWidgetProps, WidgetState> {
     }
   };
 
-  handleMessageReceive = (event: MessageEvent) => {
-    // Accept messages only from the current iframe
-    if (!this.props.source?.includes(event.origin)) {
-      return;
-    }
-
-    this.props.updateWidgetMetaProperty("message", event.data, {
+  handleMessageReceive = ({
+    data,
+    lastEventId,
+    origin,
+    ports,
+  }: MessageEvent) => {
+    this.props.updateWidgetMetaProperty("messageMetadata", {
+      lastEventId,
+      origin,
+      ports,
+    });
+    this.props.updateWidgetMetaProperty("message", data, {
       triggerPropertyName: "onMessageReceived",
       dynamicString: this.props.onMessageReceived,
       event: {
@@ -186,13 +243,16 @@ class IframeWidget extends BaseWidget<IframeWidgetProps, WidgetState> {
       srcDoc,
       title,
       widgetId,
+      widgetName,
     } = this.props;
 
     return (
       <IframeComponent
         borderColor={borderColor}
         borderOpacity={borderOpacity}
+        borderRadius={this.props.borderRadius}
         borderWidth={borderWidth}
+        boxShadow={this.props.boxShadow}
         onMessageReceived={this.handleMessageReceive}
         onSrcDocChanged={this.handleSrcDocChange}
         onURLChanged={this.handleUrlChange}
@@ -201,6 +261,7 @@ class IframeWidget extends BaseWidget<IframeWidgetProps, WidgetState> {
         srcDoc={srcDoc}
         title={title}
         widgetId={widgetId}
+        widgetName={widgetName}
       />
     );
   }

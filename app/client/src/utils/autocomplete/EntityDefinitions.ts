@@ -1,21 +1,26 @@
-import { generateTypeDef } from "utils/autocomplete/dataTreeTypeDefCreator";
+import {
+  ExtraDef,
+  generateTypeDef,
+} from "utils/autocomplete/dataTreeTypeDefCreator";
 import {
   DataTreeAction,
   DataTreeAppsmith,
 } from "entities/DataTree/dataTreeFactory";
 import _ from "lodash";
-import { JSCollection } from "entities/JSCollection";
 import { EVALUATION_PATH } from "utils/DynamicBindingUtils";
+import { JSCollectionData } from "reducers/entityReducers/jsActionsReducer";
+import { Def } from "tern";
 
 const isVisible = {
   "!type": "bool",
   "!doc": "Boolean value indicating if the widget is in visible state",
 };
 
-export const entityDefinitions: Record<string, unknown> = {
-  APPSMITH: (entity: DataTreeAppsmith) => {
+export const entityDefinitions = {
+  APPSMITH: (entity: DataTreeAppsmith, extraDefsToDefine: ExtraDef) => {
     const generatedTypeDef = generateTypeDef(
       _.omit(entity, "ENTITY_TYPE", EVALUATION_PATH),
+      extraDefsToDefine,
     );
     if (
       typeof generatedTypeDef === "object" &&
@@ -38,11 +43,13 @@ export const entityDefinitions: Record<string, unknown> = {
     }
     return generatedTypeDef;
   },
-  ACTION: (entity: DataTreeAction) => {
-    const dataDef = generateTypeDef(entity.data);
-    let data: Record<string, any> = {
+  ACTION: (entity: DataTreeAction, extraDefsToDefine: ExtraDef) => {
+    const dataDef = generateTypeDef(entity.data, extraDefsToDefine);
+
+    let data: Def = {
       "!doc": "The response of the action",
     };
+
     if (_.isString(dataDef)) {
       data["!type"] = dataDef;
     } else {
@@ -58,8 +65,7 @@ export const entityDefinitions: Record<string, unknown> = {
         "!doc": "The response meta of the action",
         "!type": "?",
       },
-      run:
-        "fn(onSuccess: fn() -> void, onError: fn() -> void) -> +Promise[:t=[!0.<i>.:t]]",
+      run: "fn(params: ?) -> +Promise[:t=[!0.<i>.:t]]",
       clear: "fn() -> +Promise[:t=[!0.<i>.:t]]",
     };
   },
@@ -101,16 +107,20 @@ export const entityDefinitions: Record<string, unknown> = {
       "!doc": "Selected country code for Currency type input",
     },
   },
-  TABLE_WIDGET: (widget: any) => ({
+  TABLE_WIDGET: (widget: any, extraDefsToDefine?: ExtraDef) => ({
     "!doc":
       "The Table is the hero widget of Appsmith. You can display data from an API in a table, trigger an action when a user selects a row and even work with large paginated data sets",
     "!url": "https://docs.appsmith.com/widget-reference/table",
-    selectedRow: generateTypeDef(widget.selectedRow),
-    selectedRows: generateTypeDef(widget.selectedRows),
+    selectedRow: generateTypeDef(widget.selectedRow, extraDefsToDefine),
+    selectedRows: generateTypeDef(widget.selectedRows, extraDefsToDefine),
     selectedRowIndices: generateTypeDef(widget.selectedRowIndices),
     triggeredRow: generateTypeDef(widget.triggeredRow),
     selectedRowIndex: "number",
-    tableData: generateTypeDef(widget.tableData),
+    tableData: generateTypeDef(widget.tableData, extraDefsToDefine),
+    filteredTableData: generateTypeDef(
+      widget.filteredTableData,
+      extraDefsToDefine,
+    ),
     pageNo: "number",
     pageSize: "number",
     isVisible: isVisible,
@@ -120,6 +130,34 @@ export const entityDefinitions: Record<string, unknown> = {
       column: "string",
       order: ["asc", "desc"],
     },
+  }),
+  TABLE_WIDGET_V2: (widget: any, extraDefsToDefine?: ExtraDef) => ({
+    "!doc":
+      "The Table is the hero widget of Appsmith. You can display data from an API in a table, trigger an action when a user selects a row and even work with large paginated data sets",
+    "!url": "https://docs.appsmith.com/widget-reference/table",
+    selectedRow: generateTypeDef(widget.selectedRow, extraDefsToDefine),
+    selectedRows: generateTypeDef(widget.selectedRows, extraDefsToDefine),
+    selectedRowIndices: generateTypeDef(widget.selectedRowIndices),
+    triggeredRow: generateTypeDef(widget.triggeredRow),
+    updatedRow: generateTypeDef(widget.updatedRow),
+    selectedRowIndex: "number",
+    tableData: generateTypeDef(widget.tableData, extraDefsToDefine),
+    pageNo: "number",
+    pageSize: "number",
+    isVisible: isVisible,
+    searchText: "string",
+    totalRecordsCount: "number",
+    sortOrder: {
+      column: "string",
+      order: ["asc", "desc"],
+    },
+    updatedRows: generateTypeDef(widget.updatedRows, extraDefsToDefine),
+    updatedRowIndices: generateTypeDef(widget.updatedRowIndices),
+    triggeredRowIndex: generateTypeDef(widget.triggeredRowIndex),
+    pageOffset: generateTypeDef(widget.pageOffset),
+    tableHeaders: generateTypeDef(widget.tableHeaders),
+    newRow: generateTypeDef(widget.newRow),
+    isAddRowInProgress: "bool",
   }),
   VIDEO_WIDGET: {
     "!doc":
@@ -134,7 +172,7 @@ export const entityDefinitions: Record<string, unknown> = {
     "!url": "https://docs.appsmith.com/widget-reference/dropdown",
     isVisible: isVisible,
     filterText: {
-      "!type": "[string]",
+      "!type": "string",
       "!doc": "The filter text for Server side filtering",
     },
     selectedOptionValue: {
@@ -147,18 +185,8 @@ export const entityDefinitions: Record<string, unknown> = {
       "!doc": "The selected option label in a single select dropdown",
       "!url": "https://docs.appsmith.com/widget-reference/dropdown",
     },
-    selectedOptionValues: {
-      "!type": "[string]",
-      "!doc": "The array of values selected in a multi select dropdown",
-      "!url": "https://docs.appsmith.com/widget-reference/dropdown",
-    },
-    selectedOptionLabels: {
-      "!type": "[string]",
-      "!doc": "The array of selected option labels in a multi select dropdown",
-      "!url": "https://docs.appsmith.com/widget-reference/dropdown",
-    },
     isDisabled: "bool",
-    options: "[dropdownOption]",
+    options: "[$__dropdownOption__$]",
   },
   SELECT_WIDGET: {
     "!doc":
@@ -166,7 +194,7 @@ export const entityDefinitions: Record<string, unknown> = {
     "!url": "https://docs.appsmith.com/widget-reference/dropdown",
     isVisible: isVisible,
     filterText: {
-      "!type": "[string]",
+      "!type": "string",
       "!doc": "The filter text for Server side filtering",
     },
     selectedOptionValue: {
@@ -179,18 +207,8 @@ export const entityDefinitions: Record<string, unknown> = {
       "!doc": "The selected option label in a single select dropdown",
       "!url": "https://docs.appsmith.com/widget-reference/dropdown",
     },
-    selectedOptionValues: {
-      "!type": "[string]",
-      "!doc": "The array of values selected in a multi select dropdown",
-      "!url": "https://docs.appsmith.com/widget-reference/dropdown",
-    },
-    selectedOptionLabels: {
-      "!type": "[string]",
-      "!doc": "The array of selected option labels in a multi select dropdown",
-      "!url": "https://docs.appsmith.com/widget-reference/dropdown",
-    },
     isDisabled: "bool",
-    options: "[dropdownOption]",
+    options: "[$__dropdownOption__$]",
   },
   MULTI_SELECT_WIDGET: {
     "!doc":
@@ -198,7 +216,7 @@ export const entityDefinitions: Record<string, unknown> = {
     "!url": "https://docs.appsmith.com/widget-reference/dropdown",
     isVisible: isVisible,
     filterText: {
-      "!type": "[string]",
+      "!type": "string",
       "!doc": "The filter text for Server side filtering",
     },
     selectedOptionValues: {
@@ -212,7 +230,7 @@ export const entityDefinitions: Record<string, unknown> = {
       "!url": "https://docs.appsmith.com/widget-reference/dropdown",
     },
     isDisabled: "bool",
-    options: "[dropdownOption]",
+    options: "[$__dropdownOption__$]",
   },
   MULTI_SELECT_WIDGET_V2: {
     "!doc":
@@ -220,7 +238,7 @@ export const entityDefinitions: Record<string, unknown> = {
     "!url": "https://docs.appsmith.com/widget-reference/dropdown",
     isVisible: isVisible,
     filterText: {
-      "!type": "[string]",
+      "!type": "string",
       "!doc": "The filter text for Server side filtering",
     },
     selectedOptionValues: {
@@ -234,7 +252,7 @@ export const entityDefinitions: Record<string, unknown> = {
       "!url": "https://docs.appsmith.com/widget-reference/dropdown",
     },
     isDisabled: "bool",
-    options: "[dropdownOption]",
+    options: "[$__dropdownOption__$]",
   },
   IMAGE_WIDGET: {
     "!doc":
@@ -258,6 +276,12 @@ export const entityDefinitions: Record<string, unknown> = {
     text: "string",
     isDisabled: "bool",
     recaptchaToken: "string",
+  },
+  BUTTON_GROUP_WIDGET: {
+    "!doc":
+      "The Button group widget represents a set of buttons in a group. Group can have simple buttons or menu buttons with drop-down items.",
+    "!url": "https://docs.appsmith.com/widget-reference/button-group",
+    isVisible: isVisible,
   },
   DATE_PICKER_WIDGET: {
     "!doc":
@@ -297,7 +321,7 @@ export const entityDefinitions: Record<string, unknown> = {
       "Radio widget lets the user choose only one option from a predefined set of options. It is quite similar to a SingleSelect Dropdown in its functionality",
     "!url": "https://docs.appsmith.com/widget-reference/radio",
     isVisible: isVisible,
-    options: "[dropdownOption]",
+    options: "[$__dropdownOption__$]",
     selectedOptionValue: "string",
     isRequired: "bool",
   },
@@ -307,7 +331,6 @@ export const entityDefinitions: Record<string, unknown> = {
   },
   MODAL_WIDGET: {
     isVisible: isVisible,
-    isOpen: "bool",
   },
   RICH_TEXT_EDITOR_WIDGET: {
     isVisible: isVisible,
@@ -319,17 +342,21 @@ export const entityDefinitions: Record<string, unknown> = {
       "Chart widget is used to view the graphical representation of your data. Chart is the go-to widget for your data visualisation needs.",
     "!url": "https://docs.appsmith.com/widget-reference/chart",
     isVisible: isVisible,
-    chartData: "chartData",
+    chartData: {
+      seriesName: "string",
+      data: "[$__chartDataPoint__$]",
+    },
     xAxisName: "string",
     yAxisName: "string",
-    selectedDataPoint: "chartDataPoint",
+    selectedDataPoint: "$__chartDataPoint__$",
   },
-  FORM_WIDGET: (widget: any) => ({
+  FORM_WIDGET: (widget: any, extraDefsToDefine?: ExtraDef) => ({
     "!doc":
       "Form is used to capture a set of data inputs from a user. Forms are used specifically because they reset the data inputs when a form is submitted and disable submission for invalid data inputs",
     "!url": "https://docs.appsmith.com/widget-reference/form",
     isVisible: isVisible,
-    data: generateTypeDef(widget.data),
+    data: generateTypeDef(widget.data, extraDefsToDefine),
+    hasChanges: "bool",
   }),
   FORM_BUTTON_WIDGET: {
     "!doc":
@@ -342,16 +369,25 @@ export const entityDefinitions: Record<string, unknown> = {
   },
   MAP_WIDGET: {
     isVisible: isVisible,
-    center: "latLong",
-    markers: "[mapMarker]",
-    selectedMarker: "mapMarker",
+    center: {
+      lat: "number",
+      long: "number",
+      title: "string",
+    },
+    markers: "[$__mapMarker__$]",
+    selectedMarker: {
+      lat: "number",
+      long: "number",
+      title: "string",
+      description: "string",
+    },
   },
   FILE_PICKER_WIDGET: {
     "!doc":
       "Filepicker widget is used to allow users to upload files from their local machines to any cloud storage via API. Cloudinary and Amazon S3 have simple APIs for cloud storage uploads",
     "!url": "https://docs.appsmith.com/widget-reference/filepicker",
     isVisible: isVisible,
-    files: "[file]",
+    files: "[$__file__$]",
     isDisabled: "bool",
   },
   FILE_PICKER_WIDGET_V2: {
@@ -359,10 +395,10 @@ export const entityDefinitions: Record<string, unknown> = {
       "Filepicker widget is used to allow users to upload files from their local machines to any cloud storage via API. Cloudinary and Amazon S3 have simple APIs for cloud storage uploads",
     "!url": "https://docs.appsmith.com/widget-reference/filepicker",
     isVisible: isVisible,
-    files: "[file]",
+    files: "[$__file__$]",
     isDisabled: "bool",
   },
-  LIST_WIDGET: (widget: any) => ({
+  LIST_WIDGET: (widget: any, extraDefsToDefine?: ExtraDef) => ({
     "!doc":
       "Containers are used to group widgets together to form logical higher order widgets. Containers let you organize your page better and move all the widgets inside them together.",
     "!url": "https://docs.appsmith.com/widget-reference/list",
@@ -372,9 +408,9 @@ export const entityDefinitions: Record<string, unknown> = {
     },
     isVisible: isVisible,
     gridGap: "number",
-    selectedItem: generateTypeDef(widget.selectedItem),
-    items: generateTypeDef(widget.items),
-    listData: generateTypeDef(widget.listData),
+    selectedItem: generateTypeDef(widget.selectedItem, extraDefsToDefine),
+    items: generateTypeDef(widget.items, extraDefsToDefine),
+    listData: generateTypeDef(widget.listData, extraDefsToDefine),
     pageNo: generateTypeDef(widget.pageNo),
     pageSize: generateTypeDef(widget.pageSize),
   }),
@@ -392,6 +428,7 @@ export const entityDefinitions: Record<string, unknown> = {
     source: "string",
     title: "string",
     message: generateTypeDef(widget.message),
+    messageMetadata: generateTypeDef(widget.messageMetadata),
   }),
   DIVIDER_WIDGET: {
     "!doc": "Divider is a simple UI widget used as a separator",
@@ -429,7 +466,7 @@ export const entityDefinitions: Record<string, unknown> = {
     },
     isDisabled: "bool",
     isValid: "bool",
-    options: "[dropdownOption]",
+    options: "[$__dropdownOption__$]",
   },
   MULTI_SELECT_TREE_WIDGET: {
     "!doc":
@@ -448,7 +485,7 @@ export const entityDefinitions: Record<string, unknown> = {
     },
     isDisabled: "bool",
     isValid: "bool",
-    options: "[dropdownOption]",
+    options: "[$__dropdownOption__$]",
   },
   ICON_BUTTON_WIDGET: {
     "!doc":
@@ -463,7 +500,7 @@ export const entityDefinitions: Record<string, unknown> = {
     isVisible: isVisible,
     isDisabled: "bool",
     isValid: "bool",
-    options: "[dropdownOption]",
+    options: "[$__dropdownOption__$]",
     selectedValues: "[string]",
   },
   STATBOX_WIDGET: {
@@ -476,7 +513,7 @@ export const entityDefinitions: Record<string, unknown> = {
       "Audio recorder widget allows users to record using their microphone, listen to the playback, and export the data to a data source.",
     "!url": "https://docs.appsmith.com/widget-reference/recorder",
     isVisible: isVisible,
-    blobUrl: "string",
+    blobURL: "string",
     dataURL: "string",
     rawBinary: "string",
   },
@@ -508,7 +545,13 @@ export const entityDefinitions: Record<string, unknown> = {
       "Map Chart widget shows the graphical representation of your data on the map.",
     "!url": "https://docs.appsmith.com/widget-reference/map-chart",
     isVisible: isVisible,
-    selectedDataPoint: "mapChartDataPoint",
+    selectedDataPoint: {
+      id: "string",
+      label: "string",
+      originalId: "string",
+      shortLabel: "string",
+      value: "number",
+    },
   },
   INPUT_WIDGET_V2: {
     "!doc":
@@ -519,6 +562,11 @@ export const entityDefinitions: Record<string, unknown> = {
       "!doc": "The text value of the input",
       "!url": "https://docs.appsmith.com/widget-reference/input",
     },
+    inputText: {
+      "!type": "string",
+      "!doc": "The unformatted text value of the input",
+      "!url": "https://docs.appsmith.com/widget-reference/input",
+    },
     isValid: "bool",
     isVisible: isVisible,
     isDisabled: "bool",
@@ -526,16 +574,16 @@ export const entityDefinitions: Record<string, unknown> = {
   CURRENCY_INPUT_WIDGET: {
     "!doc":
       "An input text field is used to capture a currency value. Inputs are used in forms and can have custom validations.",
-    "!url": "https://docs.appsmith.com/widget-reference/input",
+    "!url": "https://docs.appsmith.com/widget-reference/currency-input",
     text: {
       "!type": "string",
       "!doc": "The formatted text value of the input",
-      "!url": "https://docs.appsmith.com/widget-reference/input",
+      "!url": "https://docs.appsmith.com/widget-reference/currency-input",
     },
     value: {
       "!type": "number",
       "!doc": "The value of the input",
-      "!url": "https://docs.appsmith.com/widget-reference/input",
+      "!url": "https://docs.appsmith.com/widget-reference/currency-input",
     },
     isValid: "bool",
     isVisible: isVisible,
@@ -552,11 +600,16 @@ export const entityDefinitions: Record<string, unknown> = {
   PHONE_INPUT_WIDGET: {
     "!doc":
       "An input text field is used to capture a phone number. Inputs are used in forms and can have custom validations.",
-    "!url": "https://docs.appsmith.com/widget-reference/input",
+    "!url": "https://docs.appsmith.com/widget-reference/phone-input",
     text: {
       "!type": "string",
       "!doc": "The text value of the input",
-      "!url": "https://docs.appsmith.com/widget-reference/input",
+      "!url": "https://docs.appsmith.com/widget-reference/phone-input",
+    },
+    value: {
+      "!type": "string",
+      "!doc": "The unformatted text value of the input",
+      "!url": "https://docs.appsmith.com/widget-reference/phone-input",
     },
     isValid: "bool",
     isVisible: isVisible,
@@ -576,46 +629,85 @@ export const entityDefinitions: Record<string, unknown> = {
     isVisible: isVisible,
     progress: "number",
   },
+  JSON_FORM_WIDGET: (widget: any) => ({
+    "!doc":
+      "JSON Form widget can be used to auto-generate forms by providing a JSON source data.",
+    // TODO: Update the url
+    "!url": "https://docs.appsmith.com/widget-reference",
+    formData: generateTypeDef(widget.formData),
+    sourceData: generateTypeDef(widget.sourceData),
+    fieldState: generateTypeDef(widget.fieldState),
+    isValid: "bool",
+  }),
+  PROGRESS_WIDGET: {
+    "!doc":
+      "Progress indicators commonly known as spinners, express an unspecified wait time or display the length of a process.",
+    "!url": "https://docs.appsmith.com/widget-reference/progress",
+    isVisible: isVisible,
+    progress: "number",
+  },
+  DOCUMENT_VIEWER_WIDGET: {
+    "!doc": "Document viewer widget is used to show documents on a page",
+    "!url": "https://docs.appsmith.com/reference/widgets/document-viewer",
+    isVisible: isVisible,
+    docUrl: "string",
+  },
+  NUMBER_SLIDER_WIDGET: {
+    "!doc":
+      "Number slider widget is used to capture user feedback from a range of values",
+    "!url": "https://docs.appsmith.com/widget-reference/circular-progress",
+    isVisible: isVisible,
+    value: "number",
+  },
+  CATEGORY_SLIDER_WIDGET: {
+    "!doc":
+      "Category slider widget is used to capture user feedback from a range of categories",
+    "!url": "https://docs.appsmith.com/widget-reference/circular-progress",
+    isVisible: isVisible,
+    value: "string",
+  },
+  RANGE_SLIDER_WIDGET: {
+    "!doc":
+      "Range slider widget is used to capture user feedback from a range of values",
+    "!url": "https://docs.appsmith.com/widget-reference/circular-progress",
+    isVisible: isVisible,
+    start: "number",
+    end: "number",
+  },
+  CODE_SCANNER_WIDGET: {
+    "!doc": "Scan a Code",
+    "!url": "https://docs.appsmith.com/reference/widgets/code-scanner",
+    isVisible: isVisible,
+    isDisabled: "bool",
+    value: "string",
+  },
 };
 
+/*
+  $__name__$ is just to reduce occurrences of global def showing up in auto completion for user as `$` is less commonly used as entityName/
+
+  GLOBAL_DEFS are maintained to support definition for array of objects which currently aren't supported by our generateTypeDef.
+*/
 export const GLOBAL_DEFS = {
-  dropdownOption: {
+  $__dropdownOption__$: {
     label: "string",
     value: "string",
   },
-  tabs: {
-    id: "string",
-    label: "string",
-  },
-  chartDataPoint: {
+  $__chartDataPoint__$: {
     x: "string",
     y: "string",
   },
-  chartData: {
-    seriesName: "string",
-    data: "[chartDataPoint]",
+  $__file__$: {
+    data: "string",
+    dataFormat: "string",
+    name: "text",
+    type: "file",
   },
-  latLong: {
-    lat: "number",
-    long: "number",
-  },
-  mapMarker: {
+  $__mapMarker__$: {
     lat: "number",
     long: "number",
     title: "string",
     description: "string",
-  },
-  file: {
-    data: "string",
-    name: "text",
-    type: "file",
-  },
-  mapChartDataPoint: {
-    id: "string",
-    label: "string",
-    originalId: "string",
-    shortLabel: "string",
-    value: "number",
   },
 };
 
@@ -642,6 +734,14 @@ export const GLOBAL_FUNCTIONS = {
     "!doc": "Store key value data locally",
     "!type": "fn(key: string, value: any) -> +Promise[:t=[!0.<i>.:t]]",
   },
+  removeValue: {
+    "!doc": "Remove key value data locally",
+    "!type": "fn(key: string) -> +Promise[:t=[!0.<i>.:t]]",
+  },
+  clearStore: {
+    "!doc": "Clear all key value data locally",
+    "!type": "fn() -> +Promise[:t=[!0.<i>.:t]]",
+  },
   download: {
     "!doc": "Download anything as a file",
     "!type":
@@ -664,19 +764,28 @@ export const GLOBAL_FUNCTIONS = {
     "!doc": "Stop executing a setInterval with id",
     "!type": "fn(id: string) -> void",
   },
+  postWindowMessage: {
+    "!doc":
+      "Establish cross-origin communication between Window objects/page and iframes",
+    "!type": "fn(message: unknown, source: string, targetOrigin: string)",
+  },
 };
 
-export const getPropsForJSActionEntity = (
-  entity: JSCollection,
-): Record<string, string> => {
-  const properties: Record<string, string> = {};
-  const actions = entity.actions;
+export const getPropsForJSActionEntity = ({
+  config,
+  data,
+}: JSCollectionData): Record<string, string> => {
+  const properties: Record<string, any> = {};
+  const actions = config.actions;
   if (actions && actions.length > 0)
-    for (let i = 0; i < entity.actions.length; i++) {
-      const action = entity.actions[i];
+    for (let i = 0; i < config.actions.length; i++) {
+      const action = config.actions[i];
       properties[action.name + "()"] = "Function";
+      if (data && action.id in data) {
+        properties[action.name + ".data"] = data[action.id];
+      }
     }
-  const variablesProps = entity.variables;
+  const variablesProps = config.variables;
   if (variablesProps && variablesProps.length > 0) {
     for (let i = 0; i < variablesProps.length; i++) {
       const variableProp = variablesProps[i];
@@ -685,3 +794,5 @@ export const getPropsForJSActionEntity = (
   }
   return properties;
 };
+
+export type EntityDefinitionsOptions = keyof typeof entityDefinitions;

@@ -6,28 +6,28 @@ import welcomeConfetti from "assets/lottie/welcome-confetti.json";
 import successAnimation from "assets/lottie/success-animation.json";
 import {
   DATA_TREE_KEYWORDS,
+  DEDICATED_WORKER_GLOBAL_SCOPE_IDENTIFIERS,
   JAVASCRIPT_KEYWORDS,
-  WINDOW_OBJECT_METHODS,
-  WINDOW_OBJECT_PROPERTIES,
 } from "constants/WidgetValidation";
-import { GLOBAL_FUNCTIONS } from "./autocomplete/EntityDefinitions";
-import { get, set } from "lodash";
-import { Org } from "constants/orgConstants";
-import {
-  isPermitted,
-  PERMISSION_TYPE,
-} from "pages/Applications/permissionHelpers";
-import { User } from "constants/userConstants";
-import { getAppsmithConfigs } from "@appsmith/configs";
-import { sha256 } from "js-sha256";
+import { get, set, isNil, has, uniq } from "lodash";
+import { Workspace } from "@appsmith/constants/workspaceConstants";
+import { hasCreateNewAppPermission } from "@appsmith/utils/permissionHelpers";
 import moment from "moment";
-import log from "loglevel";
 import { extraLibrariesNames, isDynamicValue } from "./DynamicBindingUtils";
 import { ApiResponse } from "api/ApiResponses";
 import { DSLWidget } from "widgets/constants";
 import * as Sentry from "@sentry/react";
-
-const { cloudHosting, intercomAppID } = getAppsmithConfigs();
+import { matchPath } from "react-router";
+import {
+  BUILDER_CUSTOM_PATH,
+  BUILDER_PATH,
+  BUILDER_PATH_DEPRECATED,
+  VIEWER_CUSTOM_PATH,
+  VIEWER_PATH,
+  VIEWER_PATH_DEPRECATED,
+} from "constants/routes";
+import history from "./history";
+import { APPSMITH_GLOBAL_FUNCTIONS } from "components/editorComponents/ActionCreator/constants";
 
 export const snapToGrid = (
   columnWidth: number,
@@ -207,16 +207,51 @@ export const flashElementsById = (
     setTimeout(() => {
       const el = document.getElementById(id);
 
-      el?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-        inline: "center",
-      });
-
       if (el) flashElement(el, flashTimeout, flashClass);
     }, timeout);
   });
 };
+
+/**
+ * Scrolls to the widget of WidgetId without any animantion.
+ * @param widgetId
+ * @returns
+ */
+export const quickScrollToWidget = (widgetId?: string) => {
+  if (!widgetId) return;
+
+  setTimeout(() => {
+    const el = document.getElementById(widgetId);
+    const canvas = document.getElementById("canvas-viewport");
+
+    if (el && canvas && !isElementVisibleInContainer(el, canvas)) {
+      el.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
+    }
+  }, 200);
+};
+
+// Checks if the element in a container is visible or not.
+// Can be used to decide if scroll is needed
+function isElementVisibleInContainer(
+  element: HTMLElement,
+  container: HTMLElement,
+) {
+  const elementRect = element.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  return (
+    ((elementRect.top > containerRect.top &&
+      elementRect.top < containerRect.bottom) ||
+      (elementRect.bottom < containerRect.bottom &&
+        elementRect.bottom > containerRect.top)) &&
+    ((elementRect.left > containerRect.left &&
+      elementRect.left < containerRect.right) ||
+      (elementRect.right < containerRect.right &&
+        elementRect.right > containerRect.left))
+  );
+}
 
 export const resolveAsSpaceChar = (value: string, limit?: number) => {
   // ensures that all special characters are disallowed
@@ -231,10 +266,85 @@ export const resolveAsSpaceChar = (value: string, limit?: number) => {
     .slice(0, limit || 30);
 };
 
-export const isMac = () => {
-  const platform =
-    typeof navigator !== "undefined" ? navigator.platform : undefined;
-  return !platform ? false : /Mac|iPod|iPhone|iPad/.test(platform);
+export const PLATFORM_OS = {
+  MAC: "MAC",
+  IOS: "IOS",
+  LINUX: "LINUX",
+  ANDROID: "ANDROID",
+  WINDOWS: "WINDOWS",
+};
+
+const platformOSRegex = {
+  [PLATFORM_OS.MAC]: /mac.*/i,
+  [PLATFORM_OS.IOS]: /(?:iphone|ipod|ipad|Pike v.*)/i,
+  [PLATFORM_OS.LINUX]: /(?:linux.*)/i,
+  [PLATFORM_OS.ANDROID]: /android.*|aarch64|arm.*/i,
+  [PLATFORM_OS.WINDOWS]: /win.*/i,
+};
+
+export const getPlatformOS = () => {
+  const browserPlatform =
+    typeof navigator !== "undefined" ? navigator.platform : null;
+  if (browserPlatform) {
+    const platformOSList = Object.entries(platformOSRegex);
+    const platform = platformOSList.find(([, regex]) =>
+      regex.test(browserPlatform),
+    );
+    return platform ? platform[0] : null;
+  }
+  return null;
+};
+
+export const isMacOrIOS = () => {
+  const platformOS = getPlatformOS();
+  return platformOS === PLATFORM_OS.MAC || platformOS === PLATFORM_OS.IOS;
+};
+
+export const getBrowserInfo = () => {
+  const userAgent =
+    typeof navigator !== "undefined" ? navigator.userAgent : null;
+
+  if (userAgent) {
+    let specificMatch;
+    let match =
+      userAgent.match(
+        /(opera|chrome|safari|firefox|msie|CriOS|trident(?=\/))\/?\s*(\d+)/i,
+      ) || [];
+
+    // browser
+    if (/CriOS/i.test(match[1])) match[1] = "Chrome";
+
+    if (match[1] === "Chrome") {
+      specificMatch = userAgent.match(/\b(OPR|Edge)\/(\d+)/);
+      if (specificMatch) {
+        const opera = specificMatch.slice(1);
+        return {
+          browser: opera[0].replace("OPR", "Opera"),
+          version: opera[1],
+        };
+      }
+
+      specificMatch = userAgent.match(/\b(Edg)\/(\d+)/);
+      if (specificMatch) {
+        const edge = specificMatch.slice(1);
+        return {
+          browser: edge[0].replace("Edg", "Edge (Chromium)"),
+          version: edge[1],
+        };
+      }
+    }
+
+    // version
+    match = match[2]
+      ? [match[1], match[2]]
+      : [navigator.appName, navigator.appVersion, "-?"];
+    const version = userAgent.match(/version\/(\d+)/i);
+
+    version && match.splice(1, 1, version[1]);
+
+    return { browser: match[0], version: match[1] };
+  }
+  return null;
 };
 
 /**
@@ -261,17 +371,16 @@ export const trimTrailingSlash = (path: string) => {
  * this function is meant for checking the existence of ellipsis by CSS.
  * Since ellipsis by CSS are not part of DOM, we are checking with scroll width\height and offsetidth\height.
  * ScrollWidth\ScrollHeight is always greater than the offsetWidth\OffsetHeight when ellipsis made by CSS is active.
- *
+ * Using clientWidth to fix this https://stackoverflow.com/a/21064102/8692954
  * @param element
  */
 export const isEllipsisActive = (element: HTMLElement | null) => {
-  return (
-    element &&
-    (element.offsetWidth < element.scrollWidth ||
-      element.offsetHeight < element.scrollHeight)
-  );
+  return element && element.clientWidth < element.scrollWidth;
 };
 
+export const isVerticalEllipsisActive = (element: HTMLElement | null) => {
+  return element && element.clientHeight < element.scrollHeight;
+};
 /**
  * converts array to sentences
  * for e.g - ['Pawan', 'Abhinav', 'Hetu'] --> 'Pawan, Abhinav and Hetu'
@@ -299,13 +408,12 @@ export const isNameValid = (
   invalidNames: Record<string, any>,
 ) => {
   return !(
-    name in JAVASCRIPT_KEYWORDS ||
-    name in DATA_TREE_KEYWORDS ||
-    name in GLOBAL_FUNCTIONS ||
-    name in WINDOW_OBJECT_PROPERTIES ||
-    name in WINDOW_OBJECT_METHODS ||
-    name in extraLibrariesNames ||
-    name in invalidNames
+    has(JAVASCRIPT_KEYWORDS, name) ||
+    has(DATA_TREE_KEYWORDS, name) ||
+    has(DEDICATED_WORKER_GLOBAL_SCOPE_IDENTIFIERS, name) ||
+    has(APPSMITH_GLOBAL_FUNCTIONS, name) ||
+    has(extraLibrariesNames, name) ||
+    has(invalidNames, name)
   );
 };
 
@@ -430,6 +538,7 @@ export const scrollbarWidth = () => {
 // To { isValid: false, settings.color: false}
 export const flattenObject = (data: Record<string, any>) => {
   const result: Record<string, any> = {};
+
   function recurse(cur: any, prop: any) {
     if (Object(cur) !== cur) {
       result[prop] = cur;
@@ -446,6 +555,7 @@ export const flattenObject = (data: Record<string, any>) => {
       if (isEmpty && prop) result[prop] = {};
     }
   }
+
   recurse(data, "");
   return result;
 };
@@ -466,13 +576,10 @@ export const renameKeyInObject = (object: any, key: string, newKey: string) => {
   return object;
 };
 
-// Can be used to check if the user has developer role access to org
-export const getCanCreateApplications = (currentOrg: Org) => {
-  const userOrgPermissions = currentOrg.userPermissions || [];
-  const canManage = isPermitted(
-    userOrgPermissions,
-    PERMISSION_TYPE.CREATE_APPLICATION,
-  );
+// Can be used to check if the user has developer role access to workspace
+export const getCanCreateApplications = (currentWorkspace: Workspace) => {
+  const userWorkspacePermissions = currentWorkspace.userPermissions || [];
+  const canManage = hasCreateNewAppPermission(userWorkspacePermissions ?? []);
   return canManage;
 };
 
@@ -483,28 +590,6 @@ export const getIsSafeRedirectURL = (redirectURL: string) => {
     return false;
   }
 };
-
-export function bootIntercom(user?: User) {
-  if (intercomAppID && window.Intercom) {
-    let { email, username } = user || {};
-    let name;
-    if (!cloudHosting) {
-      username = sha256(username || "");
-      // keep email undefined so that users are prompted to enter it when they reach out on intercom
-      email = undefined;
-    } else {
-      name = user?.name;
-    }
-
-    window.Intercom("boot", {
-      app_id: intercomAppID,
-      user_id: username,
-      email,
-      // keep name undefined instead of an empty string so that intercom auto assigns a name
-      name,
-    });
-  }
-}
 
 export const stopClickEventPropagation = (
   e: React.MouseEvent<HTMLDivElement, MouseEvent>,
@@ -520,10 +605,15 @@ export const stopClickEventPropagation = (
  * @param date 2021-09-08T14:14:12Z
  *
  */
-export const howMuchTimeBeforeText = (date: string) => {
+export const howMuchTimeBeforeText = (
+  date: string,
+  options: { lessThanAMinute: boolean } = { lessThanAMinute: false },
+) => {
   if (!date || !moment.isMoment(moment(date))) {
     return "";
   }
+
+  const { lessThanAMinute } = options;
 
   const now = moment();
   const checkDate = moment(date);
@@ -538,7 +628,10 @@ export const howMuchTimeBeforeText = (date: string) => {
   else if (days > 0) return `${days} day${days > 1 ? "s" : ""}`;
   else if (hours > 0) return `${hours} hr${hours > 1 ? "s" : ""}`;
   else if (minutes > 0) return `${minutes} min${minutes > 1 ? "s" : ""}`;
-  else return `${seconds} sec${seconds > 1 ? "s" : ""}`;
+  else
+    return lessThanAMinute
+      ? "less than a minute"
+      : `${seconds} sec${seconds > 1 ? "s" : ""}`;
 };
 
 /**
@@ -564,17 +657,20 @@ export const truncateString = (
  *
  * @returns
  */
-export const modText = () => (isMac() ? <span>&#8984;</span> : "CTRL");
+export const modText = () => (isMacOrIOS() ? <span>&#8984;</span> : "Ctrl +");
+export const altText = () => (isMacOrIOS() ? <span>&#8997;</span> : "Alt +");
+export const shiftText = () =>
+  isMacOrIOS() ? <span>&#8682;</span> : "Shift +";
 
-export const undoShortCut = () => <span>{modText()}+Z</span>;
+export const undoShortCut = () => <span>{modText()} Z</span>;
 
 export const redoShortCut = () =>
-  isMac() ? (
+  isMacOrIOS() ? (
     <span>
-      {modText()}+<span>&#8682;</span>+Z
+      {modText()} {shiftText()} Z
     </span>
   ) : (
-    <span>{modText()}+Y</span>
+    <span>{modText()} Y</span>
   );
 
 /**
@@ -592,28 +688,6 @@ export const trimQueryString = (value = "") => {
 export const getSearchQuery = (search = "", key: string) => {
   const params = new URLSearchParams(search);
   return decodeURIComponent(params.get(key) || "");
-};
-
-/**
- * get query params object
- * ref: https://stackoverflow.com/a/8649003/1543567
- */
-export const getQueryParamsObject = () => {
-  const search = window.location.search.substring(1);
-  if (!search) return {};
-  try {
-    return JSON.parse(
-      '{"' +
-        decodeURI(search)
-          .replace(/"/g, '\\"')
-          .replace(/&/g, '","')
-          .replace(/=/g, '":"') +
-        '"}',
-    );
-  } catch (e) {
-    log.error(e, "error parsing search string");
-    return {};
-  }
 };
 
 /*
@@ -635,6 +709,28 @@ export function unFocus(document: Document, window: Window) {
 
 export function getLogToSentryFromResponse(response?: ApiResponse) {
   return response && response?.responseMeta?.status >= 500;
+}
+
+const BLACKLIST_COLORS = ["#ffffff"];
+const HEX_REGEX = /#[0-9a-fA-F]{6}/gi;
+const RGB_REGEX = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d+(?:\.\d+)?))?\)/gi;
+
+/**
+ * extract colors from string
+ *
+ * @param text
+ * @returns
+ */
+export function extractColorsFromString(text: string) {
+  const colors = new Set();
+
+  [...(text.match(RGB_REGEX) || []), ...(text.match(HEX_REGEX) || [])]
+    .filter((d) => BLACKLIST_COLORS.indexOf(d.toLowerCase()) === -1)
+    .forEach((color) => {
+      colors.add(color.toLowerCase());
+    });
+
+  return Array.from(colors) as Array<string>;
 }
 
 /*
@@ -695,3 +791,228 @@ export const captureInvalidDynamicBindingPath = (
   }
   return currentDSL;
 };
+
+/**
+ * Function to handle undefined returned in case of using [].find()
+ * @param result
+ * @param errorMessage
+ * @returns the result if not undefined or throws an Error
+ */
+export function shouldBeDefined<T>(
+  result: T | undefined | null,
+  errorMessage: string,
+): T {
+  if (result === undefined || result === null) {
+    throw new TypeError(errorMessage);
+  }
+
+  return result;
+}
+/*
+ * Check if a value is null / undefined / empty string
+ *
+ * @param value: any
+ */
+export const isEmptyOrNill = (value: any) => {
+  return isNil(value) || (isString(value) && value === "");
+};
+
+export const isURLDeprecated = (url: string) => {
+  return !!matchPath(url, {
+    path: [
+      trimQueryString(BUILDER_PATH_DEPRECATED),
+      trimQueryString(VIEWER_PATH_DEPRECATED),
+    ],
+    strict: false,
+    exact: false,
+  });
+};
+
+export const getUpdatedRoute = (
+  path: string,
+  params: Record<string, string>,
+) => {
+  let updatedPath = path;
+  const match = matchPath<{ applicationSlug: string; pageSlug: string }>(path, {
+    path: [trimQueryString(BUILDER_PATH), trimQueryString(VIEWER_PATH)],
+    strict: false,
+    exact: false,
+  });
+  if (match?.params) {
+    const { applicationSlug, pageSlug } = match?.params;
+    if (params.customSlug) {
+      updatedPath = updatedPath.replace(
+        `${applicationSlug}/${pageSlug}`,
+        `${params.customSlug}-`,
+      );
+      return updatedPath;
+    }
+    if (params.applicationSlug)
+      updatedPath = updatedPath.replace(
+        applicationSlug,
+        params.applicationSlug,
+      );
+    if (params.pageSlug)
+      updatedPath = updatedPath.replace(pageSlug, `${params.pageSlug}-`);
+    return updatedPath;
+  }
+  const matchCustomPath = matchPath<{ customSlug: string }>(path, {
+    path: [BUILDER_CUSTOM_PATH, VIEWER_CUSTOM_PATH],
+  });
+  if (matchCustomPath?.params) {
+    const { customSlug } = matchCustomPath.params;
+    if (params.customSlug) {
+      updatedPath = updatedPath.replace(
+        `${customSlug}`,
+        `${params.customSlug}-`,
+      );
+    } else if (params.applicationSlug && params.pageSlug) {
+      updatedPath = updatedPath.replace(
+        `${customSlug}`,
+        `${params.applicationSlug}/${params.pageSlug}-`,
+      );
+    }
+  }
+  return updatedPath;
+};
+
+// to split relative url into array, so specific parts can be bolded on UI preview
+export const splitPathPreview = (
+  url: string,
+  customSlug?: string,
+): string | string[] => {
+  const slugMatch = matchPath<{ pageId: string; pageSlug: string }>(
+    url,
+    VIEWER_PATH,
+  );
+
+  const customSlugMatch = matchPath<{ pageId: string; customSlug: string }>(
+    url,
+    VIEWER_CUSTOM_PATH,
+  );
+
+  if (!customSlug && slugMatch?.isExact) {
+    const { pageSlug } = slugMatch.params;
+    const splitUrl = url.split(pageSlug);
+    splitUrl.splice(
+      1,
+      0,
+      pageSlug.slice(0, pageSlug.length - 1), // to split -
+      pageSlug.slice(pageSlug.length - 1),
+    );
+    return splitUrl;
+  } else if (customSlug && customSlugMatch?.isExact) {
+    const { customSlug } = customSlugMatch.params;
+    const splitUrl = url.split(customSlug);
+    splitUrl.splice(
+      1,
+      0,
+      customSlug.slice(0, customSlug.length - 1), // to split -
+      customSlug.slice(customSlug.length - 1),
+    );
+    return splitUrl;
+  }
+
+  return url;
+};
+
+export const updateSlugNamesInURL = (params: Record<string, string>) => {
+  const { pathname, search } = window.location;
+  // Do not update old URLs
+  if (isURLDeprecated(pathname)) return;
+  const newURL = getUpdatedRoute(pathname, params);
+  history.replace(newURL + search);
+};
+
+/**
+ * Function to get valid supported mimeType for different browsers
+ * @param media "video" | "audio"
+ * @returns mimeType string
+ */
+export const getSupportedMimeTypes = (media: "video" | "audio") => {
+  const videoTypes = ["webm", "ogg", "mp4", "x-matroska"];
+  const audioTypes = ["webm", "ogg", "mp3", "x-matroska"];
+  const codecs = [
+    "should-not-be-supported",
+    "vp9",
+    "vp9.0",
+    "vp8",
+    "vp8.0",
+    "avc1",
+    "av1",
+    "h265",
+    "h.265",
+    "h264",
+    "h.264",
+    "opus",
+    "pcm",
+    "aac",
+    "mpeg",
+    "mp4a",
+  ];
+  const supported: Array<string> = [];
+  const isSupported = MediaRecorder.isTypeSupported;
+  const types = media === "video" ? videoTypes : audioTypes;
+
+  types.forEach((type: string) => {
+    const mimeType = `${media}/${type}`;
+    // without codecs
+    isSupported(mimeType) && supported.push(mimeType);
+
+    // with codecs
+    codecs.forEach((codec) =>
+      [
+        `${mimeType};codecs=${codec}`,
+        `${mimeType};codecs=${codec.toUpperCase()}`,
+      ].forEach(
+        (variation) => isSupported(variation) && supported.push(variation),
+      ),
+    );
+  });
+  return supported[0];
+};
+
+export function AutoBind(target: any, _: string, descriptor: any) {
+  if (typeof descriptor.value === "function")
+    descriptor.value = descriptor.value.bind(target);
+  return descriptor;
+}
+
+/**
+ * Add item to an array which could be undefined
+ * @param arr1 Base Array (could be undefined)
+ * @param item Item to add to array
+ * @param makeUnique Should make sure array has unique entries
+ * @returns array which includes items from arr1 and item
+ */
+export function pushToArray(
+  item: unknown,
+  arr1?: unknown[],
+  makeUnique = false,
+) {
+  if (Array.isArray(arr1)) arr1.push(item);
+  else return [item];
+
+  if (makeUnique) return uniq(arr1);
+  return arr1;
+}
+
+/**
+ * Add items to array which could be undefined
+ * @param arr1 Base Array (could be undefined)
+ * @param items Items to add to arr1
+ * @param makeUnique Should make sure array has unique entries
+ * @returns array which contains items from arr1 and items
+ */
+export function concatWithArray(
+  items: unknown[],
+  arr1?: unknown[],
+  makeUnique = false,
+) {
+  let finalArr: unknown[] = [];
+  if (Array.isArray(arr1)) finalArr = arr1.concat(items);
+  else finalArr = finalArr.concat(items);
+
+  if (makeUnique) return uniq(finalArr);
+  return finalArr;
+}

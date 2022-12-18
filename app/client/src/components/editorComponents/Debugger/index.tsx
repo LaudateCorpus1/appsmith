@@ -1,37 +1,30 @@
-import Icon, { IconSize } from "components/ads/Icon";
+import { Icon, IconSize } from "design-system";
 import React from "react";
-import { useDispatch } from "react-redux";
-import { useSelector } from "store";
+import { useDispatch, useSelector } from "react-redux";
 import styled from "styled-components";
 import DebuggerTabs from "./DebuggerTabs";
-import { AppState } from "reducers";
+import { AppState } from "@appsmith/reducers";
 import {
-  setCurrentTab,
+  setCanvasDebuggerSelectedTab,
   showDebugger as showDebuggerAction,
 } from "actions/debuggerActions";
 import AnalyticsUtil from "utils/AnalyticsUtil";
 import { Colors } from "constants/Colors";
-import { getTypographyByKey } from "constants/DefaultTheme";
 import { stopEventPropagation } from "utils/AppsmithUtils";
 import {
   getMessageCount,
   hideDebuggerIconSelector,
 } from "selectors/debuggerSelectors";
 import { matchBuilderPath } from "constants/routes";
-import TooltipComponent from "components/ads/Tooltip";
+import { getTypographyByKey, TooltipComponent } from "design-system";
 import { DEBUGGER_TAB_KEYS } from "./helpers";
 
 function Debugger() {
-  const messageCounters = useSelector(getMessageCount);
-
-  const totalMessageCount = messageCounters.errors + messageCounters.warnings;
   const showDebugger = useSelector(
     (state: AppState) => state.ui.debugger.isOpen,
   );
 
-  return showDebugger ? (
-    <DebuggerTabs defaultIndex={totalMessageCount ? 0 : 1} />
-  ) : null;
+  return showDebugger ? <DebuggerTabs /> : null;
 }
 
 const TriggerContainer = styled.div<{
@@ -42,13 +35,12 @@ const TriggerContainer = styled.div<{
   overflow: visible;
   display: flex;
   align-items: center;
-  margin-right: ${(props) => props.theme.spaces[10]}px;
 
   .debugger-count {
     color: ${Colors.WHITE};
-    ${(props) => getTypographyByKey(props, "btnSmall")}
-    height: 20px;
-    width: 20px;
+    ${getTypographyByKey("btnSmall")}
+    height: 16px;
+    width: 16px;
     background-color: ${(props) =>
       props.errorCount + props.warningCount > 0
         ? props.errorCount === 0
@@ -59,8 +51,9 @@ const TriggerContainer = styled.div<{
     display: flex;
     align-items: center;
     justify-content: center;
-    top: 0;
+    top: -8px;
     left: 100%;
+    font-size: 10px;
     border-radius: 50%;
   }
 `;
@@ -86,9 +79,9 @@ export function DebuggerTrigger() {
       return;
     } else {
       if (totalMessageCount > 0) {
-        dispatch(setCurrentTab(DEBUGGER_TAB_KEYS.ERROR_TAB));
+        dispatch(setCanvasDebuggerSelectedTab(DEBUGGER_TAB_KEYS.ERROR_TAB));
       } else {
-        dispatch(setCurrentTab(DEBUGGER_TAB_KEYS.LOGS_TAB));
+        dispatch(setCanvasDebuggerSelectedTab(DEBUGGER_TAB_KEYS.LOGS_TAB));
       }
     }
     stopEventPropagation(e);

@@ -1,16 +1,15 @@
-import {
-  updateAndSaveLayout,
-  WidgetAddChild,
-  WidgetAddChildren,
-} from "actions/pageActions";
-import { Toaster } from "components/ads/Toast";
+import { updateAndSaveLayout, WidgetAddChild } from "actions/pageActions";
+import { Toaster } from "design-system";
 import {
   ReduxAction,
   ReduxActionErrorTypes,
   ReduxActionTypes,
   WidgetReduxActionTypes,
-} from "constants/ReduxActionConstants";
-import { RenderModes } from "constants/WidgetConstants";
+} from "@appsmith/constants/ReduxActionConstants";
+import {
+  MAIN_CONTAINER_WIDGET_ID,
+  RenderModes,
+} from "constants/WidgetConstants";
 import { ENTITY_TYPE } from "entities/AppsmithConsole";
 import {
   CanvasWidgetsReduxState,
@@ -27,15 +26,25 @@ import {
   executeWidgetBlueprintOperations,
   traverseTreeAndExecuteBlueprintChildOperations,
 } from "./WidgetBlueprintSagas";
-import { getParentBottomRowAfterAddingWidget } from "./WidgetOperationUtils";
+import {
+  getParentBottomRowAfterAddingWidget,
+  resizeCanvasToLowestWidget,
+} from "./WidgetOperationUtils";
 import log from "loglevel";
 import { getDataTree } from "selectors/dataTreeSelectors";
 import { generateReactKey } from "utils/generators";
 import { WidgetProps } from "widgets/BaseWidget";
 import WidgetFactory from "utils/WidgetFactory";
-import { omit } from "lodash";
+import omit from "lodash/omit";
 import produce from "immer";
 import { GRID_DENSITY_MIGRATION_V1 } from "widgets/constants";
+import { getPropertiesToUpdate } from "./WidgetOperationSagas";
+import { klona as clone } from "klona/full";
+import { DataTree } from "entities/DataTree/dataTreeFactory";
+import { MainCanvasReduxState } from "reducers/uiReducers/mainCanvasReducer";
+import { getMainCanvasProps } from "selectors/editorSelectors";
+import { generateAutoHeightLayoutTreeAction } from "actions/autoHeightActions";
+
 const WidgetTypes = WidgetFactory.widgetTypes;
 
 type GeneratedWidgetPayload = {
@@ -49,7 +58,7 @@ type WidgetAddTabChild = {
 };
 
 function* getEntityNames() {
-  const evalTree = yield select(getDataTree);
+  const evalTree: DataTree = yield select(getDataTree);
   return Object.keys(evalTree);
 }
 
@@ -71,6 +80,9 @@ function* getChildWidgetProps(
   const restDefaultConfig = omit(WidgetFactory.widgetConfigMap.get(type), [
     "blueprint",
   ]);
+  const themeDefaultConfig =
+    WidgetFactory.getWidgetStylesheetConfigMap(type) || {};
+
   if (!widgetName) {
     const widgetNames = Object.keys(widgets).map((w) => widgets[w].widgetName);
     const entityNames: string[] = yield call(getEntityNames);
@@ -106,6 +118,7 @@ function* getChildWidgetProps(
     minHeight,
     widgetId: newWidgetId,
     renderMode: RenderModes.CANVAS,
+    ...themeDefaultConfig,
   };
   const widget = generateWidgetProps(
     parent,
@@ -120,8 +133,24 @@ function* getChildWidgetProps(
   );
 
   widget.widgetId = newWidgetId;
+  /**
+   * un-evaluated childStylesheet used by widgets; so they are to be excluded
+   * from the dynamicBindingPathList and they are not included as a part of
+   * the props send to getPropertiesToUpdate.
+   */
+  const themeConfigWithoutChildStylesheet = omit(
+    themeDefaultConfig,
+    "childStylesheet",
+  );
+  const { dynamicBindingPathList } = yield call(
+    getPropertiesToUpdate,
+    widget,
+    themeConfigWithoutChildStylesheet,
+  );
+  widget.dynamicBindingPathList = clone(dynamicBindingPathList);
   return widget;
 }
+
 function* generateChildWidgets(
   parent: FlattenedWidgetProps,
   params: WidgetAddChild,
@@ -222,7 +251,7 @@ export function* getUpdateDslAfterCreatingChild(
   const stateParent: FlattenedWidgetProps = yield select(getWidget, widgetId);
   // const parent = Object.assign({}, stateParent);
   // Get all the widgets from the canvasWidgetsReducer
-  const stateWidgets = yield select(getWidgets);
+  const stateWidgets: CanvasWidgetsReduxState = yield select(getWidgets);
   const widgets = Object.assign({}, stateWidgets);
   // Generate the full WidgetProps of the widget to be added.
   const childWidgetPayload: GeneratedWidgetPayload = yield generateChildWidgets(
@@ -270,9 +299,27 @@ export function* getUpdateDslAfterCreatingChild(
   const updatedWidgets: CanvasWidgetsReduxState = yield call(
     traverseTreeAndExecuteBlueprintChildOperations,
     parent,
-    addChildPayload.newWidgetId,
+    [addChildPayload.newWidgetId],
     widgets,
   );
+
+  if (widgetId === MAIN_CONTAINER_WIDGET_ID) {
+    const mainCanvasProps: MainCanvasReduxState = yield select(
+      getMainCanvasProps,
+    );
+    const mainCanvasMinHeight = mainCanvasProps?.height;
+
+    //updates bottom Row of main Canvas
+    updatedWidgets[
+      MAIN_CONTAINER_WIDGET_ID
+    ].bottomRow = resizeCanvasToLowestWidget(
+      updatedWidgets,
+      widgetId,
+      updatedWidgets[MAIN_CONTAINER_WIDGET_ID].bottomRow,
+      mainCanvasMinHeight,
+    );
+  }
+
   return updatedWidgets;
 }
 
@@ -288,7 +335,14 @@ export function* addChildSaga(addChildAction: ReduxAction<WidgetAddChild>) {
     const updatedWidgets: {
       [widgetId: string]: FlattenedWidgetProps;
     } = yield call(getUpdateDslAfterCreatingChild, addChildAction.payload);
+
     yield put(updateAndSaveLayout(updatedWidgets));
+    yield put({
+      type: ReduxActionTypes.RECORD_RECENTLY_ADDED_WIDGET,
+      payload: [addChildAction.payload.newWidgetId],
+    });
+    yield put(generateAutoHeightLayoutTreeAction(true, true));
+
     log.debug("add child computations took", performance.now() - start, "ms");
     // go up till MAIN_CONTAINER, if there is a operation CHILD_OPERATIONS IN ANY PARENT,
     // call execute
@@ -297,59 +351,6 @@ export function* addChildSaga(addChildAction: ReduxAction<WidgetAddChild>) {
       type: ReduxActionErrorTypes.WIDGET_OPERATION_ERROR,
       payload: {
         action: WidgetReduxActionTypes.WIDGET_ADD_CHILD,
-        error,
-      },
-    });
-  }
-}
-
-// This is different from addChildSaga
-// It does not go through the blueprint based creation
-// It simply uses the provided widget props to create widgets
-// Use this only when we're 100% sure of all the props the children will need
-export function* addChildrenSaga(
-  addChildrenAction: ReduxAction<WidgetAddChildren>,
-) {
-  try {
-    const { children, widgetId } = addChildrenAction.payload;
-    const stateWidgets = yield select(getWidgets);
-    const widgets = { ...stateWidgets };
-    const widgetNames = Object.keys(widgets).map((w) => widgets[w].widgetName);
-    const entityNames = yield call(getEntityNames);
-
-    children.forEach((child) => {
-      // Create only if it doesn't already exist
-      if (!widgets[child.widgetId]) {
-        const defaultConfig: any = WidgetFactory.widgetConfigMap.get(
-          child.type,
-        );
-        const newWidgetName = getNextEntityName(defaultConfig.widgetName, [
-          ...widgetNames,
-          ...entityNames,
-        ]);
-        // update the list of widget names for the next iteration
-        widgetNames.push(newWidgetName);
-        widgets[child.widgetId] = {
-          ...child,
-          widgetName: newWidgetName,
-          renderMode: RenderModes.CANVAS,
-        };
-
-        const existingChildren = widgets[widgetId].children || [];
-
-        widgets[widgetId] = {
-          ...widgets[widgetId],
-          children: [...existingChildren, child.widgetId],
-        };
-      }
-    });
-
-    yield put(updateAndSaveLayout(widgets));
-  } catch (error) {
-    yield put({
-      type: ReduxActionErrorTypes.WIDGET_OPERATION_ERROR,
-      payload: {
-        action: WidgetReduxActionTypes.WIDGET_ADD_CHILDREN,
         error,
       },
     });
@@ -405,16 +406,15 @@ function* addNewTabChildSaga(
     "Tab ",
     tabsArray.map((tab: any) => tab.label),
   );
-  const newTabIndex = Object.keys(tabs)?.length - 1;
 
   tabs = {
     ...tabs,
     [newTabId]: {
       id: newTabId,
+      index: tabsArray.length,
       label: newTabLabel,
       widgetId: newTabWidgetId,
       isVisible: true,
-      index: newTabIndex,
     },
   };
   const newTabProps: any = getChildTabData(tabProps, {
@@ -433,7 +433,6 @@ function* addNewTabChildSaga(
 export default function* widgetAdditionSagas() {
   yield all([
     takeEvery(WidgetReduxActionTypes.WIDGET_ADD_CHILD, addChildSaga),
-    takeEvery(WidgetReduxActionTypes.WIDGET_ADD_CHILDREN, addChildrenSaga),
     takeEvery(ReduxActionTypes.WIDGET_ADD_NEW_TAB_CHILD, addNewTabChildSaga),
   ]);
 }

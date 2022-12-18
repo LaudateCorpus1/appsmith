@@ -3,13 +3,17 @@ import styled, { withTheme } from "styled-components";
 import { Icon, Popover, PopoverPosition } from "@blueprintjs/core";
 import { Theme } from "constants/DefaultTheme";
 import { useSelector, useDispatch } from "react-redux";
-import { getIsGitConnected } from "../../../../selectors/gitSyncSelectors";
-import getFeatureFlags from "utils/featureFlags";
+import { getIsGitConnected } from "selectors/gitSyncSelectors";
 import { setIsGitSyncModalOpen } from "actions/gitSyncActions";
 import { GitSyncModalTab } from "entities/GitSync";
 import { Colors } from "constants/Colors";
 
 import { ReactComponent as GitBranch } from "assets/icons/ads/git-branch.svg";
+import AnalyticsUtil from "utils/AnalyticsUtil";
+import {
+  CONNECT_TO_GIT_OPTION,
+  CURRENT_DEPLOY_PREVIEW_OPTION,
+} from "@appsmith/constants/messages";
 
 const DeployLinkDialog = styled.div`
   flex-direction: column;
@@ -70,7 +74,6 @@ type Props = {
 export const DeployLinkButton = withTheme((props: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const dispatch = useDispatch();
-
   const isGitConnected = useSelector(getIsGitConnected);
 
   const onClose = () => {
@@ -79,6 +82,9 @@ export const DeployLinkButton = withTheme((props: Props) => {
 
   const goToGitConnectionPopup = () => {
     setIsOpen(false);
+    AnalyticsUtil.logEvent("GS_CONNECT_GIT_CLICK", {
+      source: "Deploy button",
+    });
     dispatch(
       setIsGitSyncModalOpen({
         isOpen: true,
@@ -92,23 +98,31 @@ export const DeployLinkButton = withTheme((props: Props) => {
       canEscapeKeyClose={false}
       content={
         <DeployLinkDialog>
-          {getFeatureFlags().GIT && !isGitConnected && (
-            <DeployLink onClick={goToGitConnectionPopup}>
+          {!isGitConnected && (
+            <DeployLink
+              className="t--connect-to-git-btn"
+              onClick={goToGitConnectionPopup}
+            >
               <IconWrapper>
                 <GitBranchIcon />
               </IconWrapper>
-              <DeployUrl>Connect to Git Repository</DeployUrl>
+              <DeployUrl>{CONNECT_TO_GIT_OPTION()}</DeployUrl>
             </DeployLink>
           )}
 
-          <DeployLink href={props.link} onClick={onClose} target="_blank">
+          <DeployLink
+            className="t--current-deployed-preview-btn"
+            href={props.link}
+            onClick={onClose}
+            target="_blank"
+          >
             <IconWrapper>
               <Icon
                 color={props.theme.colors.header.deployToolTipText}
                 icon="share"
               />
             </IconWrapper>
-            <DeployUrl>Current deployed version</DeployUrl>
+            <DeployUrl>{CURRENT_DEPLOY_PREVIEW_OPTION()}</DeployUrl>
           </DeployLink>
         </DeployLinkDialog>
       }
@@ -116,8 +130,14 @@ export const DeployLinkButton = withTheme((props: Props) => {
       modifiers={{ offset: { enabled: true, offset: "0, -3" } }}
       onClose={onClose}
       position={PopoverPosition.BOTTOM_RIGHT}
+      transitionDuration={0}
     >
-      <div onClick={() => setIsOpen(true)}>{props.trigger}</div>
+      <div
+        className="t--deploy-popup-option-trigger"
+        onClick={() => setIsOpen(true)}
+      >
+        {props.trigger}
+      </div>
     </Popover>
   );
 });

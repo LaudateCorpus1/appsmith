@@ -1,8 +1,11 @@
 import { DependencyMap, DynamicPath } from "utils/DynamicBindingUtils";
-import { DataTreeAction, ENTITY_TYPE } from "entities/DataTree/dataTreeFactory";
+import {
+  ENTITY_TYPE,
+  UnEvalTreeAction,
+} from "entities/DataTree/dataTreeFactory";
 import { ActionData } from "reducers/entityReducers/actionsReducer";
 import {
-  getBindingPathsOfAction,
+  getBindingAndReactivePathsOfAction,
   getDataTreeActionConfigPath,
 } from "entities/Action/actionProperties";
 
@@ -10,7 +13,7 @@ export const generateDataTreeAction = (
   action: ActionData,
   editorConfig: any[],
   dependencyConfig: DependencyMap = {},
-): DataTreeAction => {
+): UnEvalTreeAction => {
   let dynamicBindingPathList: DynamicPath[] = [];
   let datasourceUrl = "";
 
@@ -38,26 +41,37 @@ export const generateDataTreeAction = (
       getDataTreeActionConfigPath,
     );
   });
+
+  const { bindingPaths, reactivePaths } = getBindingAndReactivePathsOfAction(
+    action.config,
+    editorConfig,
+  );
+
   return {
+    actionId: action.config.id,
     run: {},
     clear: {},
-    actionId: action.config.id,
-    name: action.config.name,
-    pluginId: action.config.pluginId,
-    pluginType: action.config.pluginType,
-    config: action.config.actionConfiguration,
-    dynamicBindingPathList,
-    data: action.data ? action.data.body : {},
+    data: action.data ? action.data.body : undefined,
+    isLoading: action.isLoading,
     responseMeta: {
       statusCode: action.data?.statusCode,
       isExecutionSuccess: action.data?.isExecutionSuccess || false,
       headers: action.data?.headers,
     },
+    config: action.config.actionConfiguration,
     ENTITY_TYPE: ENTITY_TYPE.ACTION,
-    isLoading: action.isLoading,
-    bindingPaths: getBindingPathsOfAction(action.config, editorConfig),
-    dependencyMap,
-    logBlackList: {},
     datasourceUrl,
+    __config__: {
+      actionId: action.config.id,
+      name: action.config.name,
+      pluginId: action.config.pluginId,
+      pluginType: action.config.pluginType,
+      dynamicBindingPathList,
+      ENTITY_TYPE: ENTITY_TYPE.ACTION,
+      bindingPaths,
+      reactivePaths,
+      dependencyMap,
+      logBlackList: {},
+    },
   };
 };

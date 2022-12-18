@@ -20,6 +20,12 @@ export class ConfigFactory {
         name: item.id,
         ...item,
       });
+
+      item?.advanced?.forEach((subItem) => {
+        ConfigFactory.settingsMap[subItem.id] = {
+          ...subItem,
+        };
+      });
     });
     config?.children?.forEach((child) => ConfigFactory.registerSettings(child));
   }
@@ -33,6 +39,7 @@ export class ConfigFactory {
     }
 
     return {
+      icon: config.icon,
       title: config.title,
       slug: config.type,
       subText: config.subText,

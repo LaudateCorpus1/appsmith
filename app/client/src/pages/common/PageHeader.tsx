@@ -1,52 +1,57 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { connect } from "react-redux";
-import { getCurrentUser } from "selectors/usersSelectors";
-import styled, { css } from "styled-components";
+import { connect, useDispatch, useSelector } from "react-redux";
+import { getCurrentUser, selectFeatureFlags } from "selectors/usersSelectors";
+import styled from "styled-components";
 import StyledHeader from "components/designSystems/appsmith/StyledHeader";
-import { ReactComponent as AppsmithLogo } from "assets/svg/appsmith_logo_primary.svg";
-import { AppState } from "reducers";
+import { AppState } from "@appsmith/reducers";
 import { User, ANONYMOUS_USERNAME } from "constants/userConstants";
-import { AUTH_LOGIN_URL, APPLICATIONS_URL } from "constants/routes";
-import Button from "components/editorComponents/Button";
+import {
+  AUTH_LOGIN_URL,
+  APPLICATIONS_URL,
+  matchApplicationPath,
+  matchTemplatesPath,
+  TEMPLATES_PATH,
+  TEMPLATES_ID_PATH,
+  matchTemplatesIdPath,
+} from "constants/routes";
 import history from "utils/history";
+import Button from "components/editorComponents/Button";
 import ProfileDropdown from "./ProfileDropdown";
-import Bell from "notifications/Bell";
 import { Colors } from "constants/Colors";
 import { useIsMobileDevice } from "utils/hooks/useDeviceDetect";
 import { ReactComponent as TwoLineHamburger } from "assets/icons/ads/two-line-hamburger.svg";
 import MobileSideBar from "./MobileSidebar";
 import { Indices } from "constants/Layers";
-import Icon, { IconSize } from "components/ads/Icon";
+import { Icon, IconSize } from "design-system";
+import { getTemplateNotificationSeenAction } from "actions/templateActions";
+import { getTenantConfig } from "@appsmith/selectors/tenantSelectors";
 
 const StyledPageHeader = styled(StyledHeader)<{
   hideShadow?: boolean;
   isMobile?: boolean;
   showSeparator?: boolean;
+  showingTabs: boolean;
 }>`
+  box-shadow: none;
+  justify-content: normal;
   background: white;
   height: 48px;
   color: white;
-  flex-direction: row;
   position: fixed;
   top: 0;
   z-index: ${Indices.Layer9};
-  box-shadow: ${(props) =>
-    props.hideShadow && !props.isMobile
-      ? `none`
-      : `0px 4px 4px rgba(0, 0, 0, 0.05)`};
-  ${(props) => props.showSeparator && !props.isMobile && sideBorder}
+  box-shadow: 0px 1px 0px ${Colors.GALLERY_2};
   ${({ isMobile }) =>
     isMobile &&
     `
     padding: 0 12px;
     padding-left: 10px;
-  `}
+  `};
 `;
 
 const HeaderSection = styled.div`
   display: flex;
-  flex: 1;
   align-items: center;
 
   .t--appsmith-logo {
@@ -54,17 +59,6 @@ const HeaderSection = styled.div`
       max-width: 110px;
       width: 110px;
     }
-  }
-`;
-
-const sideBorder = css`
-  &:after {
-    content: "";
-    position: absolute;
-    left: ${(props) => props.theme.homePage.sidebar}px;
-    width: 1px;
-    height: 100%;
-    background-color: ${Colors.GALLERY_2};
   }
 `;
 
@@ -77,6 +71,30 @@ const StyledTwoLineHamburger = styled(TwoLineHamburger)`
   cursor: pointer;
 `;
 
+const Tabs = styled.div`
+  display: flex;
+  font-size: 16px;
+  line-height: 24px;
+  box-sizing: border-box;
+  margin-left: ${(props) => props.theme.spaces[16]}px;
+  height: 100%;
+  gap: ${(props) => `${props.theme.spaces[0]}px ${props.theme.spaces[12]}px`};
+  flex: 1;
+  padding-top: ${(props) => props.theme.spaces[1]}px;
+`;
+const TabName = styled.div<{ isSelected: boolean }>`
+  color: ${Colors.GRAY};
+  border-bottom: 2px solid transparent;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  ${(props) =>
+    props.isSelected &&
+    `border-bottom: 2px solid var(--ads-color-brand);
+  color: ${Colors.COD_GRAY};`}
+  cursor: pointer;
+`;
+
 type PageHeaderProps = {
   user?: User;
   hideShadow?: boolean;
@@ -86,47 +104,104 @@ type PageHeaderProps = {
 export function PageHeader(props: PageHeaderProps) {
   const { user } = props;
   const location = useLocation();
+  const dispatch = useDispatch();
   const queryParams = new URLSearchParams(location.search);
   const isMobile = useIsMobileDevice();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const tenantConfig = useSelector(getTenantConfig);
   let loginUrl = AUTH_LOGIN_URL;
   if (queryParams.has("redirectUrl")) {
     loginUrl += `?redirectUrl
     =${queryParams.get("redirectUrl")}`;
   }
 
+  const featureFlags = useSelector(selectFeatureFlags);
+
+  useEffect(() => {
+    dispatch(getTemplateNotificationSeenAction());
+  }, []);
+
+  const tabs = [
+    {
+      title: "Apps",
+      path: APPLICATIONS_URL,
+      matcher: matchApplicationPath,
+    },
+    {
+      title: "Templates",
+      path: TEMPLATES_PATH,
+      matcher: matchTemplatesPath,
+    },
+    {
+      title: "Templates id",
+      path: TEMPLATES_ID_PATH,
+      matcher: matchTemplatesIdPath,
+    },
+  ];
+
+  const showTabs = useMemo(() => {
+    return tabs.some((tab) => tab.matcher(location.pathname));
+  }, [featureFlags, location.pathname]);
+
   return (
     <StyledPageHeader
+      data-testid="t--appsmith-page-header"
       hideShadow={props.hideShadow || false}
       isMobile={isMobile}
       showSeparator={props.showSeparator || false}
+      showingTabs={showTabs}
     >
       <HeaderSection>
-        <Link className="t--appsmith-logo" to={APPLICATIONS_URL}>
-          <AppsmithLogo />
-        </Link>
+        {tenantConfig.brandLogoUrl && (
+          <Link className="t--appsmith-logo" to={APPLICATIONS_URL}>
+            <img alt="Logo" className="h-6" src={tenantConfig.brandLogoUrl} />
+          </Link>
+        )}
       </HeaderSection>
+
+      <Tabs>
+        {showTabs && !isMobile && (
+          <>
+            <TabName
+              className="t--apps-tab"
+              isSelected={matchApplicationPath(location.pathname)}
+              onClick={() => history.push(APPLICATIONS_URL)}
+            >
+              <div>Apps</div>
+            </TabName>
+
+            <TabName
+              className="t--templates-tab"
+              isSelected={
+                matchTemplatesPath(location.pathname) ||
+                matchTemplatesIdPath(location.pathname)
+              }
+              onClick={() => history.push(TEMPLATES_PATH)}
+            >
+              <div>Templates</div>
+            </TabName>
+          </>
+        )}
+      </Tabs>
+
       {user && !isMobile && (
-        <>
-          {user.username !== ANONYMOUS_USERNAME && <Bell />}
-          <StyledDropDownContainer>
-            {user.username === ANONYMOUS_USERNAME ? (
-              <Button
-                filled
-                intent={"primary"}
-                onClick={() => history.push(loginUrl)}
-                size="small"
-                text="Sign In"
-              />
-            ) : (
-              <ProfileDropdown
-                name={user.name}
-                photoId={user?.photoId}
-                userName={user.username}
-              />
-            )}
-          </StyledDropDownContainer>
-        </>
+        <StyledDropDownContainer>
+          {user.username === ANONYMOUS_USERNAME ? (
+            <Button
+              filled
+              intent={"primary"}
+              onClick={() => history.push(loginUrl)}
+              size="small"
+              text="Sign In"
+            />
+          ) : (
+            <ProfileDropdown
+              name={user.name}
+              photoId={user?.photoId}
+              userName={user.username}
+            />
+          )}
+        </StyledDropDownContainer>
       )}
       {isMobile && !isMobileSidebarOpen && (
         <StyledTwoLineHamburger onClick={() => setIsMobileSidebarOpen(true)} />
@@ -139,11 +214,11 @@ export function PageHeader(props: PageHeaderProps) {
           size={IconSize.XXXXL}
         />
       )}
-      {isMobile && (
+      {isMobile && user && (
         <MobileSideBar
           isOpen={isMobileSidebarOpen}
-          name="Albin"
-          userName="albin@appsmith.com"
+          name={user.name}
+          userName={user.username}
         />
       )}
     </StyledPageHeader>

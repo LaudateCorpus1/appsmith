@@ -1,4 +1,7 @@
-import { ReduxAction, ReduxActionTypes } from "constants/ReduxActionConstants";
+import {
+  ReduxAction,
+  ReduxActionTypes,
+} from "@appsmith/constants/ReduxActionConstants";
 import {
   EventType,
   ExecuteTriggerPayload,
@@ -7,13 +10,16 @@ import {
 import * as log from "loglevel";
 import { all, call, put, takeEvery, takeLatest } from "redux-saga/effects";
 import {
-  evaluateArgumentSaga,
   evaluateAndExecuteDynamicTrigger,
+  evaluateArgumentSaga,
   evaluateSnippetSaga,
   setAppVersionOnWorkerSaga,
 } from "sagas/EvaluationsSaga";
 import navigateActionSaga from "sagas/ActionExecution/NavigateActionSaga";
-import storeValueLocally from "sagas/ActionExecution/StoreActionSaga";
+import storeValueLocally, {
+  clearLocalStore,
+  removeLocalValue,
+} from "sagas/ActionExecution/StoreActionSaga";
 import downloadSaga from "sagas/ActionExecution/DownloadActionSaga";
 import copySaga from "sagas/ActionExecution/CopyActionSaga";
 import resetWidgetActionSaga from "sagas/ActionExecution/ResetWidgetActionSaga";
@@ -33,6 +39,7 @@ import {
   logActionExecutionError,
   TriggerFailureError,
   UncaughtPromiseError,
+  UserCancelledActionExecutionError,
 } from "sagas/ActionExecution/errorUtils";
 import {
   clearIntervalSaga,
@@ -43,6 +50,9 @@ import {
   stopWatchCurrentLocation,
   watchCurrentLocation,
 } from "sagas/ActionExecution/GetCurrentLocationSaga";
+import { requestModalConfirmationSaga } from "sagas/UtilSagas";
+import { ModalType } from "reducers/uiReducers/modalActionReducer";
+import { postMessageSaga } from "./PostMessageSaga";
 
 export type TriggerMeta = {
   source?: TriggerSource;
@@ -89,6 +99,12 @@ export function* executeActionTriggers(
     case ActionTriggerType.STORE_VALUE:
       yield call(storeValueLocally, trigger.payload);
       break;
+    case ActionTriggerType.REMOVE_VALUE:
+      yield call(removeLocalValue, trigger.payload);
+      break;
+    case ActionTriggerType.CLEAR_STORE:
+      yield call(clearLocalStore);
+      break;
     case ActionTriggerType.DOWNLOAD:
       yield call(downloadSaga, trigger.payload);
       break;
@@ -125,6 +141,20 @@ export function* executeActionTriggers(
     case ActionTriggerType.STOP_WATCHING_CURRENT_LOCATION:
       response = yield call(stopWatchCurrentLocation, eventType, triggerMeta);
       break;
+    case ActionTriggerType.CONFIRMATION_MODAL:
+      const payloadInfo = {
+        name: trigger?.payload?.funName,
+        modalOpen: true,
+        modalType: ModalType.RUN_ACTION,
+      };
+      const flag = yield call(requestModalConfirmationSaga, payloadInfo);
+      if (!flag) {
+        throw new UserCancelledActionExecutionError();
+      }
+      break;
+    case ActionTriggerType.POST_MESSAGE:
+      yield call(postMessageSaga, trigger.payload, triggerMeta);
+      break;
     default:
       log.error("Trigger type unknown", trigger);
       throw Error("Trigger type unknown");
@@ -132,25 +162,28 @@ export function* executeActionTriggers(
   return response;
 }
 
-export function* executeAppAction(payload: ExecuteTriggerPayload) {
+export function* executeAppAction(payload: ExecuteTriggerPayload): any {
   const {
+    callbackData,
     dynamicString,
     event: { type },
-    responseData,
+    globalContext,
     source,
     triggerPropertyName,
   } = payload;
-  log.debug({ dynamicString, responseData });
+
+  log.debug({ dynamicString, callbackData, globalContext });
   if (dynamicString === undefined) {
     throw new Error("Executing undefined action");
   }
 
-  yield call(
+  return yield call(
     evaluateAndExecuteDynamicTrigger,
     dynamicString,
     type,
     { source, triggerPropertyName },
-    responseData,
+    callbackData,
+    globalContext,
   );
 }
 
@@ -160,7 +193,9 @@ function* initiateActionTriggerExecution(
   const { event, source, triggerPropertyName } = action.payload;
   // Clear all error for this action trigger. In case the error still exists,
   // it will be created again while execution
-  AppsmithConsole.deleteError(`${source?.id}-${triggerPropertyName}`);
+  AppsmithConsole.deleteErrors([
+    { id: `${source?.id}-${triggerPropertyName}` },
+  ]);
   try {
     yield call(executeAppAction, action.payload);
     if (event.callback) {

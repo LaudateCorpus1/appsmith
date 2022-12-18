@@ -1,7 +1,6 @@
 import React from "react";
-import Dropdown from "components/ads/Dropdown";
-import StyledFormGroup from "components/ads/formFields/FormGroup";
-import { FormTextFieldProps } from "components/ads/formFields/TextField";
+import { Dropdown, FormGroup as StyledFormGroup } from "design-system";
+import { FormTextFieldProps } from "components/utils/ReduxFormTextField";
 import { WrappedFieldInputProps, WrappedFieldMetaProps } from "redux-form";
 import styled from "styled-components";
 import { OptionType } from "./constants";
@@ -76,28 +75,43 @@ export const DropdownWrapper = styled(StyledFormGroup)`
       border: 1px solid rgba(0, 0, 0, 8%);
     }
   }
+
+  .ads-dropdown-errorMsg {
+    font-size: ${(props) => props.theme.fontSizes[3]}px;
+  }
+`;
+
+export const Center = styled.div`
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: absolute;
 `;
 
 export function withDropdown(options: OptionType[], width: string) {
   return function DropdownField(
-    ComponentProps: FormTextFieldProps & {
+    componentProps: FormTextFieldProps & {
       meta: Partial<WrappedFieldMetaProps>;
       input: Partial<WrappedFieldInputProps>;
     },
   ) {
     function onSelect(value?: string) {
-      ComponentProps.input.onChange && ComponentProps.input.onChange(value);
-      ComponentProps.input.onBlur && ComponentProps.input.onBlur(value);
+      componentProps.input.onChange && componentProps.input.onChange(value);
+      componentProps.input.onBlur && componentProps.input.onBlur(value);
     }
 
-    const selected =
-      options.find((option) => option.value == ComponentProps.input.value) ||
-      {};
+    const selected = options.find(
+      (option) => option.value == componentProps.input.value,
+    ) || { label: componentProps.placeholder };
+    const hasError = componentProps.meta.invalid && componentProps.meta.touched;
 
     return (
       <Dropdown
         className={DROPDOWN_CLASSNAME}
         dontUsePortal
+        errorMsg={hasError ? componentProps.meta.error : ""}
         fillOptions
         onSelect={onSelect}
         options={options}

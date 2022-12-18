@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import Dialog from "components/ads/DialogComponent";
 import {
   getDisconnectDocUrl,
   getShowRepoLimitErrorModal,
@@ -10,36 +9,43 @@ import {
   setIsDisconnectGitModalOpen,
   setShowRepoLimitErrorModal,
 } from "actions/gitSyncActions";
-import Button, { Category, Size } from "components/ads/Button";
 import styled, { useTheme } from "styled-components";
-import { MENU_HEIGHT } from "./constants";
-import Text, { TextType } from "components/ads/Text";
+import {
+  Button,
+  Category,
+  DialogComponent as Dialog,
+  Icon,
+  IconSize,
+  Size,
+  Text,
+  TextType,
+} from "design-system";
 import { Colors } from "constants/Colors";
 import {
+  CONTACT_SALES_MESSAGE_ON_INTERCOM,
   CONTACT_SUPPORT,
   CONTACT_SUPPORT_TO_UPGRADE,
   createMessage,
-  DISCONNECT_CAUSE_APPLICATION_BREAK,
-  DISCONNECT_GIT,
+  REVOKE_CAUSE_APPLICATION_BREAK,
+  REVOKE_EXISTING_REPOSITORIES_INFO,
   LEARN_MORE,
   REPOSITORY_LIMIT_REACHED,
   REPOSITORY_LIMIT_REACHED_INFO,
-  DISCONNECT_EXISTING_REPOSITORIES,
-  DISCONNECT_EXISTING_REPOSITORIES_INFO,
-  CONTACT_SALES_MESSAGE_ON_INTERCOM,
+  REVOKE_ACCESS,
+  REVOKE_EXISTING_REPOSITORIES,
 } from "@appsmith/constants/messages";
-import Icon, { IconSize } from "components/ads/Icon";
 import Link from "./components/Link";
 import { get } from "lodash";
 import { Theme } from "constants/DefaultTheme";
 import {
   getCurrentApplication,
-  getUserApplicationsOrgs,
+  getWorkspaceIdForImport,
+  getUserApplicationsWorkspaces,
 } from "selectors/applicationSelectors";
 import {
   ApplicationPayload,
   ReduxActionTypes,
-} from "constants/ReduxActionConstants";
+} from "@appsmith/constants/ReduxActionConstants";
 import AnalyticsUtil from "utils/AnalyticsUtil";
 import InfoWrapper from "./components/InfoWrapper";
 
@@ -50,67 +56,94 @@ const Container = styled.div`
   flex-direction: column;
   position: relative;
   overflow-y: hidden;
-  padding: 0px ${(props) => props.theme.spaces[4]}px;
 `;
 
 const BodyContainer = styled.div`
   display: flex;
   flex-direction: column;
-  height: calc(100% - ${MENU_HEIGHT}px);
+  height: 100%;
 `;
 
 const CloseBtnContainer = styled.div`
   position: absolute;
-  right: ${(props) => props.theme.spaces[1]}px;
-  top: 0px;
-
-  padding: ${(props) => props.theme.spaces[1]}px;
-  border-radius: ${(props) => props.theme.radii[1]}px;
+  right: 0;
+  top: 0;
 `;
 
 const ButtonContainer = styled.div`
-  margin-top: ${(props) => `${props.theme.spaces[7]}px`};
+  margin-top: 0;
 `;
 
 const ApplicationWrapper = styled.div`
-  margin-top: ${(props) => props.theme.spaces[8]}px;
+  margin-bottom: ${(props) => props.theme.spaces[7]}px;
   display: flex;
   justify-content: space-between;
+
+  & > div {
+    max-width: 60%;
+  }
 `;
 
 const TextWrapper = styled.div`
   display: block;
+  word-break: break-word;
+`;
+
+const AppListContainer = styled.div`
+  height: calc(100% - 40px);
+  margin-top: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  padding-right: 5px;
+
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(75, 72, 72, 0.5);
+    width: 4px;
+    border-radius: ${(props) => props.theme.radii[3]}px;
+  }
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  position: relative;
 `;
 
 function RepoLimitExceededErrorModal() {
   const isOpen = useSelector(getShowRepoLimitErrorModal);
   const dispatch = useDispatch();
   const application = useSelector(getCurrentApplication);
-  const userOrgs = useSelector(getUserApplicationsOrgs);
+  const userWorkspaces = useSelector(getUserApplicationsWorkspaces);
+  const workspaceIdForImport = useSelector(getWorkspaceIdForImport);
   const docURL = useSelector(getDisconnectDocUrl);
-  const [orgName, setOrgName] = useState("");
+  const [workspaceName, setWorkspaceName] = useState("");
   const applications = useMemo(() => {
-    if (userOrgs) {
-      const org: any = userOrgs.find((organizationObject: any) => {
-        const { organization } = organizationObject;
-        return organization.id === application?.organizationId;
+    if (userWorkspaces) {
+      const workspace: any = userWorkspaces.find((workspaceObject: any) => {
+        const { workspace } = workspaceObject;
+        if (!application && workspaceIdForImport) {
+          return workspace.id === workspaceIdForImport;
+        } else {
+          return workspace.id === application?.workspaceId;
+        }
       });
-      setOrgName(org?.organization.name || "");
+      setWorkspaceName(workspace?.workspace.name || "");
       return (
-        org?.applications.filter((application: ApplicationPayload) => {
+        workspace?.applications.filter((application: ApplicationPayload) => {
+          const data = application.gitApplicationMetadata;
           return (
-            application.gitApplicationMetadata &&
-            application.gitApplicationMetadata.remoteUrl &&
-            application.gitApplicationMetadata.branchName &&
-            application.gitApplicationMetadata.repoName &&
-            application.gitApplicationMetadata.isRepoPrivate
+            data &&
+            data.remoteUrl &&
+            data.branchName &&
+            data.repoName &&
+            data.isRepoPrivate
           );
         }) || []
       );
     } else {
       return [];
     }
-  }, [userOrgs]);
+  }, [userWorkspaces, workspaceIdForImport]);
   const onClose = () => dispatch(setShowRepoLimitErrorModal(false));
   const openDisconnectGitModal = useCallback(
     (applicationId: string, name: string) => {
@@ -140,7 +173,7 @@ function RepoLimitExceededErrorModal() {
     if (window.Intercom) {
       window.Intercom(
         "showNewMessage",
-        createMessage(CONTACT_SALES_MESSAGE_ON_INTERCOM, orgName),
+        createMessage(CONTACT_SALES_MESSAGE_ON_INTERCOM, workspaceName),
       );
     }
   };
@@ -150,8 +183,9 @@ function RepoLimitExceededErrorModal() {
       canEscapeKeyClose
       canOutsideClickClose
       className="t--git-repo-limited-modal"
-      isOpen={!!isOpen}
+      isOpen={isOpen}
       maxWidth={"900px"}
+      noModalBodyMarginTop
       onClose={onClose}
       width={"550px"}
     >
@@ -162,7 +196,7 @@ function RepoLimitExceededErrorModal() {
           </Text>
           <Text
             color={Colors.BLACK}
-            style={{ marginTop: theme.spaces[3] }}
+            style={{ marginTop: theme.spaces[3], width: "410px" }}
             type={TextType.P1}
           >
             {createMessage(REPOSITORY_LIMIT_REACHED_INFO)}
@@ -176,7 +210,7 @@ function RepoLimitExceededErrorModal() {
           >
             <Icon
               fillColor={Colors.YELLOW_LIGHT}
-              name="info"
+              name="warning-line"
               size={IconSize.XXXL}
             />
             <div style={{ display: "block" }}>
@@ -191,7 +225,7 @@ function RepoLimitExceededErrorModal() {
           </InfoWrapper>
           <ButtonContainer>
             <Button
-              category={Category.tertiary}
+              category={Category.secondary}
               className="t--contact-sales-button"
               onClick={() => {
                 AnalyticsUtil.logEvent("GS_CONTACT_SALES_CLICK", {
@@ -204,65 +238,72 @@ function RepoLimitExceededErrorModal() {
               text={createMessage(CONTACT_SUPPORT)}
             />
           </ButtonContainer>
-          <Text
-            color={Colors.BLACK}
-            style={{ marginTop: theme.spaces[17] }}
-            type={TextType.H1}
-          >
-            {createMessage(DISCONNECT_EXISTING_REPOSITORIES)}
-          </Text>
-          <Text
-            color={Colors.BLACK}
-            style={{ marginTop: theme.spaces[3], width: 410 }}
-            type={TextType.P1}
-          >
-            {createMessage(DISCONNECT_EXISTING_REPOSITORIES_INFO)}
-          </Text>
-          <InfoWrapper isError style={{ margin: `${theme.spaces[7]}px 0px` }}>
-            <Icon fillColor={Colors.CRIMSON} name="info" size={IconSize.XXXL} />
+          <div style={{ marginTop: theme.spaces[15] }}>
+            <Text color={Colors.BLACK} type={TextType.H1}>
+              {createMessage(REVOKE_EXISTING_REPOSITORIES)}
+            </Text>
+          </div>
+          <div style={{ marginTop: theme.spaces[3], width: 410 }}>
+            <Text color={Colors.BLACK} type={TextType.P1}>
+              {createMessage(REVOKE_EXISTING_REPOSITORIES_INFO)}
+            </Text>
+          </div>
+          <InfoWrapper isError style={{ margin: `${theme.spaces[7]}px 0px 0` }}>
+            <Icon
+              fillColor={Colors.CRIMSON}
+              name="warning-line"
+              size={IconSize.XXXL}
+            />
             <div style={{ display: "block" }}>
               <Text
                 color={Colors.CRIMSON}
                 style={{ marginRight: theme.spaces[2] }}
                 type={TextType.P3}
               >
-                {createMessage(DISCONNECT_CAUSE_APPLICATION_BREAK)}
+                {createMessage(REVOKE_CAUSE_APPLICATION_BREAK)}
               </Text>
               <Link
+                className="t--learn-more-repo-limit-modal"
                 color={Colors.CRIMSON}
                 link={docURL}
                 text={createMessage(LEARN_MORE)}
               />
             </div>
           </InfoWrapper>
-          {applications.map((application: ApplicationPayload) => {
-            const { gitApplicationMetadata } = application;
-            return (
-              <ApplicationWrapper key={application.id}>
-                <div>
-                  <TextWrapper>
-                    <Text color={Colors.OXFORD_BLUE} type={TextType.H4}>
-                      {application.name}
-                    </Text>
-                  </TextWrapper>
-                  <TextWrapper>
-                    <Text color={Colors.OXFORD_BLUE} type={TextType.P3}>
-                      {gitApplicationMetadata?.remoteUrl}
-                    </Text>
-                  </TextWrapper>
-                </div>
-                <Link
-                  color={Colors.CRIMSON}
-                  hasIcon
-                  link=""
-                  onClick={() =>
-                    openDisconnectGitModal(application.id, application.name)
-                  }
-                  text={createMessage(DISCONNECT_GIT)}
-                />
-              </ApplicationWrapper>
-            );
-          })}
+          <AppListContainer>
+            {applications.map((application: ApplicationPayload) => {
+              const { gitApplicationMetadata } = application;
+              return (
+                <ApplicationWrapper
+                  className="t--connected-app-wrapper"
+                  key={application.id}
+                >
+                  <div>
+                    <TextWrapper>
+                      <Text color={Colors.OXFORD_BLUE} type={TextType.H4}>
+                        {application.name}
+                      </Text>
+                    </TextWrapper>
+                    <TextWrapper>
+                      <Text color={Colors.OXFORD_BLUE} type={TextType.P3}>
+                        {gitApplicationMetadata?.remoteUrl}
+                      </Text>
+                    </TextWrapper>
+                  </div>
+                  <Link
+                    className="t--disconnect-link"
+                    color={Colors.CRIMSON}
+                    hasIcon
+                    link=""
+                    onClick={() =>
+                      openDisconnectGitModal(application.id, application.name)
+                    }
+                    text={createMessage(REVOKE_ACCESS)}
+                  />
+                </ApplicationWrapper>
+              );
+            })}
+          </AppListContainer>
         </BodyContainer>
         <CloseBtnContainer onClick={onClose}>
           <Icon

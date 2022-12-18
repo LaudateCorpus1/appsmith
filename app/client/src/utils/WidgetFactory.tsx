@@ -1,101 +1,34 @@
-import {
-  WidgetBuilder,
-  WidgetDataProps,
-  WidgetProps,
-  WidgetState,
-} from "widgets/BaseWidget";
+import { WidgetBuilder, WidgetProps, WidgetState } from "widgets/BaseWidget";
 import React from "react";
-import {
-  PropertyPaneConfig,
-  PropertyPaneControlConfig,
-  ValidationConfig,
-} from "constants/PropertyControlConstants";
-import { generateReactKey } from "./generators";
+import { PropertyPaneConfig } from "constants/PropertyControlConstants";
+
 import { WidgetConfigProps } from "reducers/entityReducers/widgetConfigReducer";
-import { ValidationTypes } from "constants/WidgetValidation";
 import { RenderMode } from "constants/WidgetConstants";
 import * as log from "loglevel";
+import { WidgetFeatures } from "./WidgetFeatures";
+import {
+  addPropertyConfigIds,
+  convertFunctionsToString,
+  enhancePropertyPaneConfig,
+  generatePropertyPaneSearchConfig,
+  addSearchConfigToPanelConfig,
+  PropertyPaneConfigTypes,
+} from "./WidgetFactoryHelpers";
+import { CanvasWidgetStructure } from "widgets/constants";
+import { Stylesheet } from "entities/AppTheming";
 
 type WidgetDerivedPropertyType = any;
 export type DerivedPropertiesMap = Record<string, string>;
-
-// TODO (abhinav): To enforce the property pane config structure in this function
-// Throw an error if the config is not of the desired format.
-const addPropertyConfigIds = (config: PropertyPaneConfig[]) => {
-  return config.map((sectionOrControlConfig: PropertyPaneConfig) => {
-    sectionOrControlConfig.id = generateReactKey();
-    if (sectionOrControlConfig.children) {
-      sectionOrControlConfig.children = addPropertyConfigIds(
-        sectionOrControlConfig.children,
-      );
-    }
-    const config = sectionOrControlConfig as PropertyPaneControlConfig;
-    if (
-      config.panelConfig &&
-      config.panelConfig.children &&
-      Array.isArray(config.panelConfig.children)
-    ) {
-      config.panelConfig.children = addPropertyConfigIds(
-        config.panelConfig.children,
-      );
-
-      (sectionOrControlConfig as PropertyPaneControlConfig) = config;
-    }
-    return sectionOrControlConfig;
-  });
-};
-
 export type WidgetType = typeof WidgetFactory.widgetTypes[number];
 
-function validatePropertyPaneConfig(config: PropertyPaneConfig[]) {
-  return config.map((sectionOrControlConfig: PropertyPaneConfig) => {
-    if (sectionOrControlConfig.children) {
-      sectionOrControlConfig.children = sectionOrControlConfig.children.map(
-        validatePropertyControl,
-      );
-    }
-    return sectionOrControlConfig;
-  });
-}
-
-function validatePropertyControl(
-  config: PropertyPaneConfig,
-): PropertyPaneConfig {
-  const _config = config as PropertyPaneControlConfig;
-  if (_config.validation !== undefined) {
-    _config.validation = validateValidationStructure(_config.validation);
-  }
-  if (_config.children) {
-    _config.children = _config.children.map(validatePropertyControl);
-  }
-  return _config;
-}
-
-function validateValidationStructure(
-  config: ValidationConfig,
-): ValidationConfig {
-  // Todo(abhinav): This only checks for top level params. Throwing nothing here.
-  if (
-    config.type === ValidationTypes.FUNCTION &&
-    config.params &&
-    config.params.fn
-  ) {
-    config.params.fnString = config.params.fn.toString();
-    if (!config.params.expected)
-      log.error(
-        `Error in configuration ${JSON.stringify(config)}: For a ${
-          ValidationTypes.FUNCTION
-        } type validation, expected type and example are mandatory`,
-      );
-    delete config.params.fn;
-  }
-  return config;
+export enum NonSerialisableWidgetConfigs {
+  CANVAS_HEIGHT_OFFSET = "canvasHeightOffset",
 }
 class WidgetFactory {
   static widgetTypes: Record<string, string> = {};
   static widgetMap: Map<
     WidgetType,
-    WidgetBuilder<WidgetProps, WidgetState>
+    WidgetBuilder<CanvasWidgetStructure, WidgetState>
   > = new Map();
   static widgetDerivedPropertiesGetterMap: Map<
     WidgetType,
@@ -114,10 +47,30 @@ class WidgetFactory {
     WidgetType,
     readonly PropertyPaneConfig[]
   > = new Map();
+  static propertyPaneContentConfigsMap: Map<
+    WidgetType,
+    readonly PropertyPaneConfig[]
+  > = new Map();
+  static propertyPaneStyleConfigsMap: Map<
+    WidgetType,
+    readonly PropertyPaneConfig[]
+  > = new Map();
+  // used to store the properties that appear in the search results
+  static propertyPaneSearchConfigsMap: Map<
+    WidgetType,
+    readonly PropertyPaneConfig[]
+  > = new Map();
+  static loadingProperties: Map<WidgetType, Array<RegExp>> = new Map();
+  static stylesheetConfigMap: Map<WidgetType, Stylesheet> = new Map();
 
   static widgetConfigMap: Map<
     WidgetType,
     Partial<WidgetProps> & WidgetConfigProps & { type: string }
+  > = new Map();
+
+  static nonSerialisableWidgetConfigMap: Map<
+    WidgetType,
+    Record<NonSerialisableWidgetConfigs, unknown>
   > = new Map();
 
   static registerWidgetBuilder(
@@ -127,24 +80,104 @@ class WidgetFactory {
     defaultPropertiesMap: Record<string, string>,
     metaPropertiesMap: Record<string, any>,
     propertyPaneConfig?: PropertyPaneConfig[],
+    propertyPaneContentConfig?: PropertyPaneConfig[],
+    propertyPaneStyleConfig?: PropertyPaneConfig[],
+    features?: WidgetFeatures,
+    loadingProperties?: Array<RegExp>,
+    stylesheetConfig?: Stylesheet,
   ) {
     if (!this.widgetTypes[widgetType]) {
       this.widgetTypes[widgetType] = widgetType;
       this.widgetMap.set(widgetType, widgetBuilder);
       this.derivedPropertiesMap.set(widgetType, derivedPropertiesMap);
-      this.defaultPropertiesMap.set(widgetType, defaultPropertiesMap);
+      this.defaultPropertiesMap.set(
+        widgetType,
+        defaultPropertiesMap as Record<string, string>,
+      );
       this.metaPropertiesMap.set(widgetType, metaPropertiesMap);
+      loadingProperties &&
+        this.loadingProperties.set(widgetType, loadingProperties);
+      stylesheetConfig &&
+        this.stylesheetConfigMap.set(widgetType, stylesheetConfig);
 
-      if (propertyPaneConfig) {
-        const validatedPropertyPaneConfig = validatePropertyPaneConfig(
+      if (Array.isArray(propertyPaneConfig) && propertyPaneConfig.length > 0) {
+        const enhancedPropertyPaneConfig = enhancePropertyPaneConfig(
           propertyPaneConfig,
+          features,
+        );
+
+        const serializablePropertyPaneConfig = convertFunctionsToString(
+          enhancedPropertyPaneConfig,
+        );
+
+        const finalPropertyPaneConfig = addPropertyConfigIds(
+          serializablePropertyPaneConfig,
         );
 
         this.propertyPaneConfigsMap.set(
           widgetType,
-          Object.freeze(addPropertyConfigIds(validatedPropertyPaneConfig)),
+          Object.freeze(finalPropertyPaneConfig),
         );
       }
+
+      if (propertyPaneContentConfig) {
+        const enhancedPropertyPaneConfig = enhancePropertyPaneConfig(
+          propertyPaneContentConfig,
+          features,
+          PropertyPaneConfigTypes.CONTENT,
+          widgetType,
+        );
+
+        const serializablePropertyPaneConfig = convertFunctionsToString(
+          enhancedPropertyPaneConfig,
+        );
+
+        const propertyPaneConfigWithIds = addPropertyConfigIds(
+          serializablePropertyPaneConfig,
+        );
+
+        const finalPropertyPaneConfig = addSearchConfigToPanelConfig(
+          propertyPaneConfigWithIds,
+        );
+
+        this.propertyPaneContentConfigsMap.set(
+          widgetType,
+          Object.freeze(finalPropertyPaneConfig),
+        );
+      }
+
+      if (propertyPaneStyleConfig) {
+        const enhancedPropertyPaneConfig = enhancePropertyPaneConfig(
+          propertyPaneStyleConfig,
+          features,
+          PropertyPaneConfigTypes.STYLE,
+        );
+
+        const serializablePropertyPaneConfig = convertFunctionsToString(
+          enhancedPropertyPaneConfig,
+        );
+
+        const propertyPaneConfigWithIds = addPropertyConfigIds(
+          serializablePropertyPaneConfig,
+        );
+
+        const finalPropertyPaneConfig = addSearchConfigToPanelConfig(
+          propertyPaneConfigWithIds,
+        );
+
+        this.propertyPaneStyleConfigsMap.set(
+          widgetType,
+          Object.freeze(finalPropertyPaneConfig),
+        );
+      }
+
+      this.propertyPaneSearchConfigsMap.set(
+        widgetType,
+        generatePropertyPaneSearchConfig(
+          WidgetFactory.getWidgetPropertyPaneContentConfig(widgetType),
+          WidgetFactory.getWidgetPropertyPaneStyleConfig(widgetType),
+        ),
+      );
     }
   }
 
@@ -155,11 +188,18 @@ class WidgetFactory {
     this.widgetConfigMap.set(widgetType, Object.freeze(config));
   }
 
+  static storeNonSerialisablewidgetConfig(
+    widgetType: string,
+    config: Record<NonSerialisableWidgetConfigs, unknown>,
+  ) {
+    this.nonSerialisableWidgetConfigMap.set(widgetType, config);
+  }
+
   static createWidget(
-    widgetData: WidgetDataProps,
+    widgetData: CanvasWidgetStructure,
     renderMode: RenderMode,
   ): React.ReactNode {
-    const widgetProps: WidgetProps = {
+    const widgetProps = {
       key: widgetData.widgetId,
       isVisible: true,
       ...widgetData,
@@ -167,7 +207,6 @@ class WidgetFactory {
     };
     const widgetBuilder = this.widgetMap.get(widgetData.type);
     if (widgetBuilder) {
-      // TODO validate props here
       const widget = widgetBuilder.buildWidget(widgetProps);
       return widget;
     } else {
@@ -217,12 +256,53 @@ class WidgetFactory {
     return map;
   }
 
+  static getWidgetPropertyPaneCombinedConfig(
+    type: WidgetType,
+  ): readonly PropertyPaneConfig[] {
+    const contentConfig = this.propertyPaneContentConfigsMap.get(type) || [];
+    const styleConfig = this.propertyPaneStyleConfigsMap.get(type) || [];
+    return [...contentConfig, ...styleConfig];
+  }
+
   static getWidgetPropertyPaneConfig(
     type: WidgetType,
   ): readonly PropertyPaneConfig[] {
     const map = this.propertyPaneConfigsMap.get(type);
+    if (!map || (map && map.length === 0)) {
+      const config = WidgetFactory.getWidgetPropertyPaneCombinedConfig(type);
+      if (config === undefined) {
+        log.error("Widget property pane config not defined", type);
+      }
+      return config;
+    }
+    return map;
+  }
+
+  static getWidgetPropertyPaneContentConfig(
+    type: WidgetType,
+  ): readonly PropertyPaneConfig[] {
+    const map = this.propertyPaneContentConfigsMap.get(type);
     if (!map) {
-      log.error("Widget property pane configs not defined", type);
+      return [];
+    }
+    return map;
+  }
+
+  static getWidgetPropertyPaneStyleConfig(
+    type: WidgetType,
+  ): readonly PropertyPaneConfig[] {
+    const map = this.propertyPaneStyleConfigsMap.get(type);
+    if (!map) {
+      return [];
+    }
+    return map;
+  }
+
+  static getWidgetPropertyPaneSearchConfig(
+    type: WidgetType,
+  ): readonly PropertyPaneConfig[] {
+    const map = this.propertyPaneSearchConfigsMap.get(type);
+    if (!map) {
       return [];
     }
     return map;
@@ -238,6 +318,19 @@ class WidgetFactory {
       };
     });
     return typeConfigMap;
+  }
+
+  static getLoadingProperties(type: WidgetType): Array<RegExp> | undefined {
+    return this.loadingProperties.get(type);
+  }
+
+  static getWidgetStylesheetConfigMap(widgetType: WidgetType) {
+    const map = this.stylesheetConfigMap.get(widgetType);
+    if (!map) {
+      log.error("Widget stylesheet properties not defined: ", widgetType);
+      return undefined;
+    }
+    return map;
   }
 }
 

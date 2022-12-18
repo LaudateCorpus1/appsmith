@@ -23,7 +23,7 @@ import {
   ReduxActionTypes,
   ReduxAction,
   WidgetReduxActionTypes,
-} from "constants/ReduxActionConstants";
+} from "@appsmith/constants/ReduxActionConstants";
 
 import {
   getWidget,
@@ -37,15 +37,19 @@ import {
   CanvasWidgetsReduxState,
   FlattenedWidgetProps,
 } from "reducers/entityReducers/canvasWidgetsReducer";
-import { updateWidgetMetaProperty } from "actions/metaActions";
+import { updateWidgetMetaPropAndEval } from "actions/metaActions";
 import { focusWidget } from "actions/widgetActions";
 import log from "loglevel";
 import { flatten } from "lodash";
 import AppsmithConsole from "utils/AppsmithConsole";
 
 import WidgetFactory from "utils/WidgetFactory";
-import { Toaster } from "components/ads/Toast";
+import { Toaster } from "design-system";
 import { deselectAllInitAction } from "actions/widgetSelectionActions";
+import { navigateToCanvas } from "pages/Editor/Explorer/Widgets/utils";
+import { getCurrentPageId } from "selectors/editorSelectors";
+import { APP_MODE } from "entities/App";
+import { getAppMode } from "selectors/applicationSelectors";
 const WidgetTypes = WidgetFactory.widgetTypes;
 
 export function* createModalSaga(action: ReduxAction<{ modalName: string }>) {
@@ -119,7 +123,9 @@ export function* showIfModalSaga(
   }
 }
 
-export function* showModalSaga(action: ReduxAction<{ modalId: string }>) {
+export function* showModalSaga(
+  action: ReduxAction<{ modalId: string; shouldSelectModal?: boolean }>,
+) {
   // First we close the currently open modals (if any)
   // Notice the empty payload.
   yield call(closeModalSaga, {
@@ -129,17 +135,21 @@ export function* showModalSaga(action: ReduxAction<{ modalId: string }>) {
     },
   });
 
-  yield put({
-    type: ReduxActionTypes.SELECT_WIDGET_INIT,
-    payload: { widgetId: action.payload.modalId },
-  });
+  const pageId: string = yield select(getCurrentPageId);
+  const appMode: APP_MODE = yield select(getAppMode);
+
+  if (appMode === APP_MODE.EDIT) navigateToCanvas(pageId);
+
   yield put(focusWidget(action.payload.modalId));
 
-  const metaProps = yield select(getWidgetMetaProps, action.payload.modalId);
+  const metaProps: Record<string, unknown> = yield select(
+    getWidgetMetaProps,
+    action.payload.modalId,
+  );
   if (!metaProps || !metaProps.isVisible) {
     // Then show the modal we would like to show.
     yield put(
-      updateWidgetMetaProperty(action.payload.modalId, "isVisible", true),
+      updateWidgetMetaPropAndEval(action.payload.modalId, "isVisible", true),
     );
     yield delay(1000);
   }
@@ -161,8 +171,11 @@ export function* closeModalSaga(
     let widgetIds: string[] = [];
     // If modalName is provided, we just want to close this modal
     if (modalName) {
-      const widget = yield select(getWidgetByName, modalName);
-      widgetIds = [widget.widgetId];
+      const widget: FlattenedWidgetProps | undefined = yield select(
+        getWidgetByName,
+        modalName,
+      );
+      widgetIds = widget ? [widget.widgetId] : [];
       yield put({
         type: ReduxActionTypes.SHOW_PROPERTY_PANE,
         payload: {},
@@ -196,7 +209,7 @@ export function* closeModalSaga(
         flatten(
           widgetIds.map((widgetId: string) => {
             return [
-              put(updateWidgetMetaProperty(widgetId, "isVisible", false)),
+              put(updateWidgetMetaPropAndEval(widgetId, "isVisible", false)),
             ];
           }),
         ),
@@ -218,7 +231,7 @@ export function* resizeModalSaga(resizeAction: ReduxAction<ModalWidgetResize>) {
     const { canvasWidgetId, height, widgetId, width } = resizeAction.payload;
 
     const stateWidget: FlattenedWidgetProps = yield select(getWidget, widgetId);
-    const stateWidgets = yield select(getWidgets);
+    const stateWidgets: CanvasWidgetsReduxState = yield select(getWidgets);
 
     let widget = { ...stateWidget };
     const widgets = { ...stateWidgets };
@@ -248,6 +261,7 @@ export function* resizeModalSaga(resizeAction: ReduxAction<ModalWidgetResize>) {
     }
 
     log.debug("resize computations took", performance.now() - start, "ms");
+    //TODO Identify the updated widgets and pass the values
     yield put(updateAndSaveLayout(widgets));
   } catch (error) {
     yield put({

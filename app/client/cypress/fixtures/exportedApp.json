@@ -1,313 +1,762 @@
 {
-    "exportedApplication": {
-      "userPermissions": [
-        "canComment:applications",
-        "manage:applications",
-        "export:applications",
-        "read:applications",
-        "publish:applications",
-        "makePublic:applications"
-      ],
-      "name": "2eacca10",
-      "isPublic": false,
-      "appIsExample": false,
-      "unreadCommentThreads": 0,
-      "color": "#F1DEFF",
-      "icon": "cat",
-      "new": true
-    },
-    "datasourceList": [],
-    "pageList": [
+  "clientSchemaVersion": 1,
+  "serverSchemaVersion": 6,
+  "exportedApplication": {
+    "name": "app5232",
+    "isPublic": false,
+    "pages": [
       {
-        "userPermissions": [
-          "read:pages",
-          "manage:pages"
-        ],
-        "gitSyncId": "61602709ae8b022ed53c23c7_2021-10-08T11:10:01.203693Z",
-        "unpublishedPage": {
-          "name": "Page1",
-          "layouts": [
-            {
-              "id": "61602709ae8b022ed53c23c8",
-              "userPermissions": [],
-              "dsl": {
-                "widgetName": "MainContainer",
-                "backgroundColor": "none",
-                "rightColumn": 1224,
-                "snapColumns": 16,
-                "detachFromLayout": true,
-                "widgetId": "0",
-                "topRow": 0,
-                "bottomRow": 1292,
-                "containerStyle": "none",
-                "snapRows": 33,
-                "parentRowSpace": 1,
-                "type": "CANVAS_WIDGET",
-                "canExtend": true,
-                "minHeight": 1292,
-                "parentColumnSpace": 1,
-                "dynamicBindingPathList": [],
-                "leftColumn": 0,
-                "children": [
-                  {
-                    "backgroundColor": "#FFFFFF",
-                    "widgetName": "Container1",
-                    "rightColumn": 8,
-                    "orientation": "VERTICAL",
-                    "snapColumns": 16,
-                    "widgetId": "mxbaasg65u",
-                    "containerStyle": "card",
-                    "topRow": 0,
-                    "bottomRow": 9,
-                    "parentRowSpace": 38,
-                    "isVisible": true,
-                    "type": "CONTAINER_WIDGET",
-                    "isLoading": false,
-                    "parentColumnSpace": 75.25,
-                    "dynamicBindingPathList": [],
-                    "leftColumn": 0,
-                    "children": [
-                      {
-                        "backgroundColor": "transparent",
-                        "widgetName": "59gdivzv7s",
-                        "rightColumn": 602,
-                        "orientation": "VERTICAL",
-                        "snapColumns": 16,
-                        "detachFromLayout": true,
-                        "widgetId": "bxekwxgc1i",
-                        "containerStyle": "none",
-                        "topRow": 0,
-                        "bottomRow": 342,
-                        "parentRowSpace": 1,
-                        "isVisible": true,
-                        "type": "CANVAS_WIDGET",
-                        "canExtend": false,
-                        "isLoading": false,
-                        "parentColumnSpace": 1,
-                        "leftColumn": 0,
-                        "children": [
-                          {
-                            "image": "",
-                            "widgetName": "Image1",
-                            "rightColumn": 10,
-                            "widgetId": "glksllew0g",
-                            "topRow": 2,
-                            "bottomRow": 5,
-                            "parentRowSpace": 38,
-                            "isVisible": true,
-                            "type": "IMAGE_WIDGET",
-                            "parentId": "bxekwxgc1i",
-                            "isLoading": false,
-                            "parentColumnSpace": 34.6875,
-                            "imageShape": "RECTANGLE",
-                            "leftColumn": 6,
-                            "defaultImage": "https://res.cloudinary.com/drako999/image/upload/v1589196259/default.png"
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "backgroundColor": "#FFFFFF",
-                    "widgetName": "Container3",
-                    "rightColumn": 16,
-                    "orientation": "VERTICAL",
-                    "snapColumns": 16,
-                    "widgetId": "i331vll2mg",
-                    "containerStyle": "card",
-                    "topRow": 9,
-                    "bottomRow": 23,
-                    "parentRowSpace": 38,
-                    "isVisible": true,
-                    "type": "CONTAINER_WIDGET",
-                    "isLoading": false,
-                    "parentColumnSpace": 75.25,
-                    "dynamicBindingPathList": [],
-                    "leftColumn": 0,
-                    "children": [
-                      {
-                        "backgroundColor": "transparent",
-                        "widgetName": "rhfg2vf1n5",
-                        "rightColumn": 1204,
-                        "orientation": "VERTICAL",
-                        "snapColumns": 16,
-                        "detachFromLayout": true,
-                        "widgetId": "rglduihhzk",
-                        "containerStyle": "none",
-                        "topRow": 0,
-                        "bottomRow": 532,
-                        "parentRowSpace": 1,
-                        "isVisible": true,
-                        "type": "CANVAS_WIDGET",
-                        "canExtend": false,
-                        "isLoading": false,
-                        "parentColumnSpace": 1,
-                        "leftColumn": 0,
-                        "children": [
-                          {
-                            "widgetName": "Chart1",
-                            "rightColumn": 8,
-                            "allowHorizontalScroll": false,
-                            "widgetId": "hwi9cwhg43",
-                            "topRow": 1,
-                            "bottomRow": 9,
-                            "parentRowSpace": 38,
-                            "isVisible": true,
-                            "type": "CHART_WIDGET",
-                            "parentId": "rglduihhzk",
-                            "isLoading": false,
-                            "chartData": [
-                              {
-                                "seriesName": "Sales",
-                                "data": [
-                                  {
-                                    "x": "Mon",
-                                    "y": 10000
-                                  },
-                                  {
-                                    "x": "Tue",
-                                    "y": 12000
-                                  },
-                                  {
-                                    "x": "Wed",
-                                    "y": 32000
-                                  },
-                                  {
-                                    "x": "Thu",
-                                    "y": 28000
-                                  },
-                                  {
-                                    "x": "Fri",
-                                    "y": 14000
-                                  },
-                                  {
-                                    "x": "Sat",
-                                    "y": 19000
-                                  },
-                                  {
-                                    "x": "Sun",
-                                    "y": 36000
-                                  }
-                                ]
-                              }
-                            ],
-                            "yAxisName": "Total Order Revenue $",
-                            "parentColumnSpace": 71.75,
-                            "chartName": "Sales on working days",
-                            "leftColumn": 2,
-                            "dynamicBindingPathList": [],
-                            "xAxisName": "Last Week",
-                            "chartType": "LINE_CHART"
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "backgroundColor": "#FFFFFF",
-                    "widgetName": "Container4",
-                    "rightColumn": 16,
-                    "orientation": "VERTICAL",
-                    "snapColumns": 16,
-                    "widgetId": "qznzsquf70",
-                    "containerStyle": "card",
-                    "topRow": 0,
-                    "bottomRow": 9,
-                    "parentRowSpace": 38,
-                    "isVisible": true,
-                    "type": "CONTAINER_WIDGET",
-                    "isLoading": false,
-                    "parentColumnSpace": 75.25,
-                    "dynamicBindingPathList": [],
-                    "leftColumn": 8,
-                    "children": [
-                      {
-                        "backgroundColor": "transparent",
-                        "widgetName": "3bn6uv0vy4",
-                        "rightColumn": 602,
-                        "orientation": "VERTICAL",
-                        "snapColumns": 16,
-                        "detachFromLayout": true,
-                        "widgetId": "7vm5mdu8ey",
-                        "containerStyle": "none",
-                        "topRow": 0,
-                        "bottomRow": 342,
-                        "parentRowSpace": 1,
-                        "isVisible": true,
-                        "type": "CANVAS_WIDGET",
-                        "canExtend": false,
-                        "isLoading": false,
-                        "parentColumnSpace": 1,
-                        "leftColumn": 0,
-                        "children": [
-                          {
-                            "widgetName": "Text1",
-                            "rightColumn": 7,
-                            "textAlign": "LEFT",
-                            "widgetId": "9xcfqahpw2",
-                            "topRow": 3,
-                            "bottomRow": 4,
-                            "parentRowSpace": 38,
-                            "isVisible": true,
-                            "type": "TEXT_WIDGET",
-                            "parentId": "bxekwxgc1i",
-                            "isLoading": false,
-                            "parentColumnSpace": 34.6875,
-                            "leftColumn": 3,
-                            "text": "Label"
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              },
-              "layoutOnLoadActions": [],
-              "new": false
-            }
-          ],
-          "userPermissions": []
-        },
-        "publishedPage": {
-          "name": "Page1",
-          "layouts": [
-            {
-              "id": "61602709ae8b022ed53c23c8",
-              "userPermissions": [],
-              "dsl": {
-                "widgetName": "MainContainer",
-                "backgroundColor": "none",
-                "rightColumn": 1224,
-                "snapColumns": 16,
-                "detachFromLayout": true,
-                "widgetId": "0",
-                "topRow": 0,
-                "bottomRow": 1254,
-                "containerStyle": "none",
-                "snapRows": 33,
-                "parentRowSpace": 1,
-                "type": "CANVAS_WIDGET",
-                "canExtend": true,
-                "version": 4,
-                "minHeight": 1292,
-                "parentColumnSpace": 1,
-                "dynamicBindingPathList": [],
-                "leftColumn": 0,
-                "children": []
-              },
-              "new": false
-            }
-          ],
-          "userPermissions": []
-        },
-        "new": true
+        "id": "Page1",
+        "isDefault": true
       }
     ],
-    "publishedDefaultPageName": "Page1",
-    "unpublishedDefaultPageName": "Page1",
-    "actionList": [],
-    "actionCollectionList": [],
-    "decryptedFields": {},
-    "publishedLayoutmongoEscapedWidgets": {},
-    "unpublishedLayoutmongoEscapedWidgets": {}
+    "publishedPages": [
+      {
+        "id": "Page1",
+        "isDefault": true
+      }
+    ],
+    "viewMode": false,
+    "appIsExample": false,
+    "unreadCommentThreads": 0,
+    "color": "#F4FFDE",
+    "icon": "single-person",
+    "slug": "app5232",
+    "evaluationVersion": 2,
+    "applicationVersion": 2,
+    "isManualUpdate": false,
+    "deleted": false
+  },
+  "datasourceList": [
+    {
+      "name": "mockdata",
+      "pluginId": "postgres-plugin",
+      "messages": [],
+      "isAutoGenerated": false,
+      "deleted": false,
+      "gitSyncId": "61c2d94747cda83965fe72b5_61c5822385c0bd4ccf7d171c"
+    }
+  ],
+  "pageList": [
+    {
+      "unpublishedPage": {
+        "name": "Page1",
+        "slug": "page1",
+        "layouts": [
+          {
+            "viewMode": false,
+            "dsl": {
+              "widgetName": "MainContainer",
+              "backgroundColor": "none",
+              "rightColumn": 816,
+              "snapColumns": 64,
+              "detachFromLayout": true,
+              "widgetId": "0",
+              "topRow": 0,
+              "bottomRow": 590,
+              "containerStyle": "none",
+              "snapRows": 125,
+              "parentRowSpace": 1,
+              "type": "CANVAS_WIDGET",
+              "canExtend": true,
+              "version": 65,
+              "minHeight": 600,
+              "parentColumnSpace": 1,
+              "dynamicBindingPathList": [],
+              "leftColumn": 0,
+              "children": [
+                {
+                  "boxShadow": "none",
+                  "widgetName": "Table1",
+                  "defaultPageSize": 0,
+                  "columnOrder": [
+                    "schema_name"
+                  ],
+                  "isVisibleDownload": true,
+                  "dynamicPropertyPathList": [],
+                  "displayName": "Table",
+                  "iconSVG": "/static/media/icon.db8a9cbd.svg",
+                  "topRow": 14,
+                  "bottomRow": 38,
+                  "isSortable": true,
+                  "parentRowSpace": 10,
+                  "type": "TABLE_WIDGET",
+                  "defaultSelectedRow": "0",
+                  "hideCard": false,
+                  "animateLoading": true,
+                  "parentColumnSpace": 12.5625,
+                  "dynamicTriggerPathList": [],
+                  "dynamicBindingPathList": [
+                    {
+                      "key": "tableData"
+                    },
+                    {
+                      "key": "primaryColumns.schema_name.computedValue"
+                    },
+                    {
+                      "key": "accentColor"
+                    }
+                  ],
+                  "leftColumn": 4,
+                  "primaryColumns": {
+                    "schema_name": {
+                      "index": 0,
+                      "width": 150,
+                      "id": "schema_name",
+                      "horizontalAlignment": "LEFT",
+                      "verticalAlignment": "CENTER",
+                      "columnType": "text",
+                      "textSize": "0.875rem",
+                      "enableFilter": true,
+                      "enableSort": true,
+                      "isVisible": true,
+                      "isDisabled": false,
+                      "isCellVisible": true,
+                      "isDerived": false,
+                      "label": "schema_name",
+                      "computedValue": "{{Table1.sanitizedTableData.map((currentRow) => ( currentRow.schema_name))}}",
+                      "borderRadius": "0px",
+                      "boxShadow": "none"
+                    }
+                  },
+                  "delimiter": ",",
+                  "key": "5ejs55im17",
+                  "derivedColumns": {},
+                  "labelTextSize": "0.875rem",
+                  "rightColumn": 25,
+                  "textSize": "0.875rem",
+                  "widgetId": "uyyp0qxfdq",
+                  "accentColor": "{{appsmith.theme.colors.primaryColor}}",
+                  "isVisibleFilters": true,
+                  "tableData": "{{get_schema.data}}",
+                  "isVisible": true,
+                  "label": "Data",
+                  "searchKey": "",
+                  "enableClientSideSearch": true,
+                  "version": 3,
+                  "totalRecordsCount": 0,
+                  "parentId": "0",
+                  "renderMode": "CANVAS",
+                  "isLoading": false,
+                  "horizontalAlignment": "LEFT",
+                  "isVisibleSearch": true,
+                  "childStylesheet": {
+                    "button": {
+                      "buttonColor": "{{appsmith.theme.colors.primaryColor}}",
+                      "borderRadius": "{{appsmith.theme.borderRadius.appBorderRadius}}",
+                      "boxShadow": "none"
+                    },
+                    "menuButton": {
+                      "menuColor": "{{appsmith.theme.colors.primaryColor}}",
+                      "borderRadius": "{{appsmith.theme.borderRadius.appBorderRadius}}",
+                      "boxShadow": "none"
+                    },
+                    "iconButton": {
+                      "menuColor": "{{appsmith.theme.colors.primaryColor}}",
+                      "borderRadius": "{{appsmith.theme.borderRadius.appBorderRadius}}",
+                      "boxShadow": "none"
+                    }
+                  },
+                  "borderRadius": "0px",
+                  "isVisiblePagination": true,
+                  "verticalAlignment": "CENTER",
+                  "columnSizeMap": {
+                    "task": 245,
+                    "step": 62,
+                    "status": 75
+                  }
+                },
+                {
+                  "boxShadow": "none",
+                  "widgetName": "Table2",
+                  "defaultPageSize": 0,
+                  "columnOrder": [
+                    "id",
+                    "title",
+                    "due",
+                    "assignee"
+                  ],
+                  "isVisibleDownload": true,
+                  "dynamicPropertyPathList": [],
+                  "displayName": "Table",
+                  "iconSVG": "/static/media/icon.db8a9cbd.svg",
+                  "topRow": 14,
+                  "bottomRow": 38,
+                  "isSortable": true,
+                  "parentRowSpace": 10,
+                  "type": "TABLE_WIDGET",
+                  "defaultSelectedRow": "0",
+                  "hideCard": false,
+                  "animateLoading": true,
+                  "parentColumnSpace": 12.5625,
+                  "dynamicTriggerPathList": [],
+                  "dynamicBindingPathList": [
+                    {
+                      "key": "tableData"
+                    },
+                    {
+                      "key": "primaryColumns.due.computedValue"
+                    },
+                    {
+                      "key": "primaryColumns.assignee.computedValue"
+                    },
+                    {
+                      "key": "primaryColumns.title.computedValue"
+                    },
+                    {
+                      "key": "primaryColumns.id.computedValue"
+                    },
+                    {
+                      "key": "accentColor"
+                    }
+                  ],
+                  "leftColumn": 30,
+                  "primaryColumns": {
+                    "due": {
+                      "index": 0,
+                      "width": 150,
+                      "id": "due",
+                      "horizontalAlignment": "LEFT",
+                      "verticalAlignment": "CENTER",
+                      "columnType": "text",
+                      "textSize": "0.875rem",
+                      "enableFilter": true,
+                      "enableSort": true,
+                      "isVisible": true,
+                      "isDisabled": false,
+                      "isCellVisible": true,
+                      "isDerived": false,
+                      "label": "due",
+                      "computedValue": "{{Table2.sanitizedTableData.map((currentRow) => ( currentRow.due))}}",
+                      "borderRadius": "0px",
+                      "boxShadow": "none"
+                    },
+                    "assignee": {
+                      "index": 1,
+                      "width": 150,
+                      "id": "assignee",
+                      "horizontalAlignment": "LEFT",
+                      "verticalAlignment": "CENTER",
+                      "columnType": "text",
+                      "textSize": "0.875rem",
+                      "enableFilter": true,
+                      "enableSort": true,
+                      "isVisible": true,
+                      "isDisabled": false,
+                      "isCellVisible": true,
+                      "isDerived": false,
+                      "label": "assignee",
+                      "computedValue": "{{Table2.sanitizedTableData.map((currentRow) => ( currentRow.assignee))}}",
+                      "borderRadius": "0px",
+                      "boxShadow": "none"
+                    },
+                    "title": {
+                      "index": 2,
+                      "width": 150,
+                      "id": "title",
+                      "horizontalAlignment": "LEFT",
+                      "verticalAlignment": "CENTER",
+                      "columnType": "text",
+                      "textSize": "0.875rem",
+                      "enableFilter": true,
+                      "enableSort": true,
+                      "isVisible": true,
+                      "isDisabled": false,
+                      "isCellVisible": true,
+                      "isDerived": false,
+                      "label": "title",
+                      "computedValue": "{{Table2.sanitizedTableData.map((currentRow) => ( currentRow.title))}}",
+                      "borderRadius": "0px",
+                      "boxShadow": "none"
+                    },
+                    "id": {
+                      "index": 4,
+                      "width": 150,
+                      "id": "id",
+                      "horizontalAlignment": "LEFT",
+                      "verticalAlignment": "CENTER",
+                      "columnType": "text",
+                      "textSize": "0.875rem",
+                      "enableFilter": true,
+                      "enableSort": true,
+                      "isVisible": true,
+                      "isDisabled": false,
+                      "isCellVisible": true,
+                      "isDerived": false,
+                      "label": "id",
+                      "computedValue": "{{Table2.sanitizedTableData.map((currentRow) => ( currentRow.id))}}",
+                      "borderRadius": "0px",
+                      "boxShadow": "none"
+                    }
+                  },
+                  "delimiter": ",",
+                  "key": "5ejs55im17",
+                  "derivedColumns": {},
+                  "labelTextSize": "0.875rem",
+                  "rightColumn": 61,
+                  "textSize": "0.875rem",
+                  "widgetId": "r1m4lkt7at",
+                  "accentColor": "{{appsmith.theme.colors.primaryColor}}",
+                  "isVisibleFilters": true,
+                  "tableData": "{{mockApi.data.headers.info}}",
+                  "isVisible": true,
+                  "label": "Data",
+                  "searchKey": "",
+                  "enableClientSideSearch": true,
+                  "version": 3,
+                  "totalRecordsCount": 0,
+                  "parentId": "0",
+                  "renderMode": "CANVAS",
+                  "isLoading": false,
+                  "horizontalAlignment": "LEFT",
+                  "isVisibleSearch": true,
+                  "childStylesheet": {
+                    "button": {
+                      "buttonColor": "{{appsmith.theme.colors.primaryColor}}",
+                      "borderRadius": "{{appsmith.theme.borderRadius.appBorderRadius}}",
+                      "boxShadow": "none"
+                    },
+                    "menuButton": {
+                      "menuColor": "{{appsmith.theme.colors.primaryColor}}",
+                      "borderRadius": "{{appsmith.theme.borderRadius.appBorderRadius}}",
+                      "boxShadow": "none"
+                    },
+                    "iconButton": {
+                      "menuColor": "{{appsmith.theme.colors.primaryColor}}",
+                      "borderRadius": "{{appsmith.theme.borderRadius.appBorderRadius}}",
+                      "boxShadow": "none"
+                    }
+                  },
+                  "borderRadius": "0px",
+                  "isVisiblePagination": true,
+                  "verticalAlignment": "CENTER",
+                  "columnSizeMap": {
+                    "task": 245,
+                    "step": 62,
+                    "status": 75,
+                    "id": 60
+                  }
+                },
+                {
+                  "boxShadow": "none",
+                  "widgetName": "Input1",
+                  "displayName": "Input",
+                  "iconSVG": "/static/media/icon.9f505595.svg",
+                  "topRow": 43,
+                  "bottomRow": 47,
+                  "parentRowSpace": 10,
+                  "autoFocus": false,
+                  "type": "INPUT_WIDGET_V2",
+                  "hideCard": false,
+                  "animateLoading": true,
+                  "parentColumnSpace": 12.5625,
+                  "dynamicTriggerPathList": [],
+                  "resetOnSubmit": true,
+                  "leftColumn": 18,
+                  "dynamicBindingPathList": [
+                    {
+                      "key": "defaultText"
+                    },
+                    {
+                      "key": "accentColor"
+                    }
+                  ],
+                  "labelStyle": "",
+                  "inputType": "TEXT",
+                  "isDisabled": false,
+                  "key": "t02w4ix9o5",
+                  "labelTextSize": "0.875rem",
+                  "isRequired": false,
+                  "rightColumn": 38,
+                  "widgetId": "9timcor5m5",
+                  "accentColor": "{{appsmith.theme.colors.primaryColor}}",
+                  "isVisible": true,
+                  "label": "",
+                  "allowCurrencyChange": false,
+                  "version": 1,
+                  "parentId": "0",
+                  "renderMode": "CANVAS",
+                  "isLoading": false,
+                  "borderRadius": "0px",
+                  "iconAlign": "left",
+                  "defaultText": "{{JSObject1.myVar1}}"
+                }
+              ]
+            },
+            "layoutOnLoadActions": [
+              [
+                {
+                  "id": "Page1_get_schema",
+                  "name": "get_schema",
+                  "confirmBeforeExecute": false,
+                  "pluginType": "DB",
+                  "jsonPathKeys": [],
+                  "timeoutInMillisecond": 10000
+                }
+              ],
+              [
+                {
+                  "id": "Page1_mockApi",
+                  "name": "mockApi",
+                  "confirmBeforeExecute": false,
+                  "pluginType": "API",
+                  "jsonPathKeys": [],
+                  "timeoutInMillisecond": 10000
+                }
+              ]
+            ],
+            "layoutOnLoadActionErrors": [],
+            "validOnPageLoadActions": true,
+            "id": "Page1",
+            "deleted": false,
+            "policies": [],
+            "userPermissions": []
+          }
+        ],
+        "userPermissions": [],
+        "policies": []
+      },
+      "publishedPage": {
+        "name": "Page1",
+        "slug": "page1",
+        "layouts": [
+          {
+            "viewMode": false,
+            "dsl": {
+              "widgetName": "MainContainer",
+              "backgroundColor": "none",
+              "rightColumn": 1224,
+              "snapColumns": 16,
+              "detachFromLayout": true,
+              "widgetId": "0",
+              "topRow": 0,
+              "bottomRow": 1254,
+              "containerStyle": "none",
+              "snapRows": 33,
+              "parentRowSpace": 1,
+              "type": "CANVAS_WIDGET",
+              "canExtend": true,
+              "version": 4,
+              "minHeight": 1292,
+              "parentColumnSpace": 1,
+              "dynamicBindingPathList": [],
+              "leftColumn": 0,
+              "children": []
+            },
+            "validOnPageLoadActions": true,
+            "id": "Page1",
+            "deleted": false,
+            "policies": [],
+            "userPermissions": []
+          }
+        ],
+        "userPermissions": [],
+        "policies": []
+      },
+      "deleted": false,
+      "gitSyncId": "61c580d685c0bd4ccf7d1716_61c580d685c0bd4ccf7d1718"
+    }
+  ],
+  "actionList": [
+    {
+      "pluginType": "DB",
+      "pluginId": "postgres-plugin",
+      "unpublishedAction": {
+        "name": "get_schema",
+        "datasource": {
+          "pluginId": "postgres-plugin",
+          "messages": [],
+          "isAutoGenerated": false,
+          "id": "mockdata",
+          "deleted": false,
+          "policies": [],
+          "userPermissions": []
+        },
+        "pageId": "Page1",
+        "actionConfiguration": {
+          "timeoutInMillisecond": 10000,
+          "paginationType": "NONE",
+          "encodeParamsToggle": true,
+          "body": "SELECT schema_name FROM information_schema.schemata;",
+          "selfReferencingDataPaths": [],
+          "pluginSpecifiedTemplates": [
+            {
+              "value": true
+            }
+          ]
+        },
+        "executeOnLoad": true,
+        "dynamicBindingPathList": [],
+        "isValid": true,
+        "invalids": [],
+        "messages": [],
+        "jsonPathKeys": [],
+        "userSetOnLoad": false,
+        "confirmBeforeExecute": false,
+        "policies": [],
+        "userPermissions": []
+      },
+      "publishedAction": {
+        "datasource": {
+          "messages": [],
+          "isAutoGenerated": false,
+          "deleted": false,
+          "policies": [],
+          "userPermissions": []
+        },
+        "messages": [],
+        "userSetOnLoad": false,
+        "confirmBeforeExecute": false,
+        "policies": [],
+        "userPermissions": []
+      },
+      "id": "Page1_get_schema",
+      "deleted": false,
+      "gitSyncId": "61c580d685c0bd4ccf7d1716_61c5832685c0bd4ccf7d171e"
+    },
+    {
+      "pluginType": "API",
+      "pluginId": "restapi-plugin",
+      "unpublishedAction": {
+        "name": "mockApi",
+        "datasource": {
+          "name": "DEFAULT_REST_DATASOURCE",
+          "pluginId": "restapi-plugin",
+          "datasourceConfiguration": {
+            "url": "https://mock-api.appsmith.com"
+          },
+          "invalids": [],
+          "messages": [],
+          "isAutoGenerated": false,
+          "deleted": false,
+          "policies": [],
+          "userPermissions": []
+        },
+        "pageId": "Page1",
+        "actionConfiguration": {
+          "timeoutInMillisecond": 10000,
+          "paginationType": "NONE",
+          "path": "/echo/get",
+          "headers": [
+            {
+              "key": "info",
+              "value": "[{\"due\":\"2021-11-23\",\"assignee\":\"Dan.Wyman@hotmail.com\",\"title\":\"Recusan\",\"id\":\"1\"},{\"due\":\"2021-11-23\",\"assignee\":\"Dashawn_Maggio30@gmail.com\",\"title\":\"Dignissimos eaque\",\"id\":\"2\"},{\"due\":\"2021-11-24\",\"assignee\":\"Curt50@gmail.com\",\"title\":\"Voluptas explicabo\",\"id\":\"3\"},{\"due\":\"2021-11-23\",\"assignee\":\"Shanna63@hotmail.com\",\"title\":\"Aut omnis.\",\"id\":\"4\"}]"
+            }
+          ],
+          "encodeParamsToggle": true,
+          "queryParameters": [],
+          "body": "",
+          "httpMethod": "GET",
+          "selfReferencingDataPaths": [],
+          "pluginSpecifiedTemplates": [
+            {
+              "value": true
+            }
+          ]
+        },
+        "executeOnLoad": true,
+        "dynamicBindingPathList": [],
+        "isValid": true,
+        "invalids": [],
+        "messages": [],
+        "jsonPathKeys": [],
+        "userSetOnLoad": false,
+        "confirmBeforeExecute": false,
+        "policies": [],
+        "userPermissions": []
+      },
+      "publishedAction": {
+        "datasource": {
+          "messages": [],
+          "isAutoGenerated": false,
+          "deleted": false,
+          "policies": [],
+          "userPermissions": []
+        },
+        "messages": [],
+        "userSetOnLoad": false,
+        "confirmBeforeExecute": false,
+        "policies": [],
+        "userPermissions": []
+      },
+      "id": "Page1_mockApi",
+      "deleted": false,
+      "gitSyncId": "61c580d685c0bd4ccf7d1716_61c580e385c0bd4ccf7d171a"
+    },
+    {
+      "pluginType": "JS",
+      "pluginId": "js-plugin",
+      "unpublishedAction": {
+        "name": "myFun1",
+        "fullyQualifiedName": "JSObject1.myFun1",
+        "datasource": {
+          "name": "UNUSED_DATASOURCE",
+          "pluginId": "js-plugin",
+          "messages": [],
+          "isAutoGenerated": false,
+          "deleted": false,
+          "policies": [],
+          "userPermissions": []
+        },
+        "pageId": "Page1",
+        "collectionId": "Page1_JSObject1",
+        "actionConfiguration": {
+          "timeoutInMillisecond": 10000,
+          "paginationType": "NONE",
+          "encodeParamsToggle": true,
+          "body": "() => {\n  return JSObject1.myVar1;\n}",
+          "selfReferencingDataPaths": [],
+          "jsArguments": [],
+          "isAsync": false
+        },
+        "executeOnLoad": false,
+        "dynamicBindingPathList": [
+          {
+            "key": "body"
+          }
+        ],
+        "isValid": true,
+        "invalids": [],
+        "messages": [],
+        "jsonPathKeys": [
+          "() => {\n  return JSObject1.myVar1;\n}"
+        ],
+        "userSetOnLoad": false,
+        "confirmBeforeExecute": false,
+        "policies": [],
+        "userPermissions": []
+      },
+      "publishedAction": {
+        "datasource": {
+          "messages": [],
+          "isAutoGenerated": false,
+          "deleted": false,
+          "policies": [],
+          "userPermissions": []
+        },
+        "messages": [],
+        "userSetOnLoad": false,
+        "confirmBeforeExecute": false,
+        "policies": [],
+        "userPermissions": []
+      },
+      "id": "Page1_JSObject1.myFun1",
+      "deleted": false,
+      "gitSyncId": "61c580d685c0bd4ccf7d1716_61c58ced85c0bd4ccf7d1722"
+    },
+    {
+      "pluginType": "JS",
+      "pluginId": "js-plugin",
+      "unpublishedAction": {
+        "name": "myFun2",
+        "fullyQualifiedName": "JSObject1.myFun2",
+        "datasource": {
+          "name": "UNUSED_DATASOURCE",
+          "pluginId": "js-plugin",
+          "messages": [],
+          "isAutoGenerated": false,
+          "deleted": false,
+          "policies": [],
+          "userPermissions": []
+        },
+        "pageId": "Page1",
+        "collectionId": "Page1_JSObject1",
+        "actionConfiguration": {
+          "timeoutInMillisecond": 10000,
+          "paginationType": "NONE",
+          "encodeParamsToggle": true,
+          "body": "() => {}",
+          "selfReferencingDataPaths": [],
+          "jsArguments": [],
+          "isAsync": false
+        },
+        "executeOnLoad": false,
+        "dynamicBindingPathList": [
+          {
+            "key": "body"
+          }
+        ],
+        "isValid": true,
+        "invalids": [],
+        "messages": [],
+        "jsonPathKeys": [
+          "() => {}"
+        ],
+        "userSetOnLoad": false,
+        "confirmBeforeExecute": false,
+        "policies": [],
+        "userPermissions": []
+      },
+      "publishedAction": {
+        "datasource": {
+          "messages": [],
+          "isAutoGenerated": false,
+          "deleted": false,
+          "policies": [],
+          "userPermissions": []
+        },
+        "messages": [],
+        "userSetOnLoad": false,
+        "confirmBeforeExecute": false,
+        "policies": [],
+        "userPermissions": []
+      },
+      "id": "Page1_JSObject1.myFun2",
+      "deleted": false,
+      "gitSyncId": "61c580d685c0bd4ccf7d1716_61c58ced85c0bd4ccf7d1724"
+    }
+  ],
+  "actionCollectionList": [
+    {
+      "unpublishedCollection": {
+        "name": "JSObject1",
+        "pageId": "Page1",
+        "pluginId": "js-plugin",
+        "pluginType": "JS",
+        "actions": [],
+        "archivedActions": [],
+        "body": "export default {\n\tmyVar1: \"Submit\",\n\tmyVar2: {},\n\tmyFun1: () => {\n\t\t//write code here\n\t\treturn this.myVar1;\n\t},\n\tmyFun2: () => {\n\t\t//write code here\n\t}\n}",
+        "variables": [
+          {
+            "name": "myVar1",
+            "value": "\"Submit\""
+          },
+          {
+            "name": "myVar2",
+            "value": "{}"
+          }
+        ],
+        "userPermissions": []
+      },
+      "id": "Page1_JSObject1",
+      "deleted": false,
+      "gitSyncId": "61c580d685c0bd4ccf7d1716_61c58ced85c0bd4ccf7d1726"
+    }
+  ],
+  "updatedResources": {
+    "actionList": [
+      "JSObject1.myFun2##ENTITY_SEPARATOR##Page1",
+      "mockApi##ENTITY_SEPARATOR##Page1",
+      "JSObject1.myFun1##ENTITY_SEPARATOR##Page1",
+      "get_schema##ENTITY_SEPARATOR##Page1"
+    ],
+    "pageList": [
+      "Page1"
+    ],
+    "actionCollectionList": [
+      "JSObject1##ENTITY_SEPARATOR##Page1"
+    ]
+  },
+  "editModeTheme": {
+    "name": "Classic",
+    "displayName": "Classic",
+    "isSystemTheme": true,
+    "deleted": false
+  },
+  "publishedTheme": {
+    "name": "Classic",
+    "displayName": "Classic",
+    "isSystemTheme": true,
+    "deleted": false
   }
+}

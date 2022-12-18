@@ -1,4 +1,4 @@
-import { ReduxActionTypes } from "constants/ReduxActionConstants";
+import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
 import {
   filterCategories,
   RecentEntity,
@@ -11,10 +11,14 @@ export const setGlobalSearchQuery = (query: string) => ({
   payload: query,
 });
 
-export const toggleShowGlobalSearchModal = (
+export const toggleShowGlobalSearchModal = () => ({
+  type: ReduxActionTypes.TOGGLE_SHOW_GLOBAL_SEARCH_MODAL,
+});
+
+export const setGlobalSearchCategory = (
   category: SearchCategory = filterCategories[SEARCH_CATEGORY_ID.DOCUMENTATION],
 ) => ({
-  type: ReduxActionTypes.TOGGLE_SHOW_GLOBAL_SEARCH_MODAL,
+  type: ReduxActionTypes.SET_GLOBAL_SEARCH_CATEGORY,
   payload: category,
 });
 
@@ -61,11 +65,6 @@ export const insertSnippet = (payload: string) => ({
 
 export const setGlobalSearchFilterContext = (payload: any) => ({
   type: ReduxActionTypes.SET_SEARCH_FILTER_CONTEXT,
-  payload,
-});
-
-export const updateRecentEntity = (payload: RecentEntity) => ({
-  type: ReduxActionTypes.UPDATE_RECENT_ENTITY,
   payload,
 });
 

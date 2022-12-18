@@ -3,29 +3,29 @@ import styled, { ThemeProvider } from "styled-components";
 import classNames from "classnames";
 import { Classes as Popover2Classes } from "@blueprintjs/popover2";
 import {
-  CurrentApplicationData,
+  ApplicationPayload,
   ReduxActionTypes,
-} from "constants/ReduxActionConstants";
-import {
-  APPLICATIONS_URL,
-  getApplicationViewerPageURL,
-} from "constants/routes";
-import AppInviteUsersForm from "pages/organization/AppInviteUsersForm";
+} from "@appsmith/constants/ReduxActionConstants";
+import { APPLICATIONS_URL } from "constants/routes";
+import AppInviteUsersForm from "pages/workspace/AppInviteUsersForm";
 import AnalyticsUtil from "utils/AnalyticsUtil";
 import { FormDialogComponent } from "components/editorComponents/form/FormDialogComponent";
 import AppsmithLogo from "assets/images/appsmith_logo_square.png";
 import { Link } from "react-router-dom";
-import { AppState } from "reducers";
+import { AppState } from "@appsmith/reducers";
 import {
   getCurrentApplicationId,
   getCurrentPageId,
   getIsPublishingApplication,
   previewModeSelector,
 } from "selectors/editorSelectors";
-import { getAllUsers, getCurrentOrgId } from "selectors/organizationSelectors";
+import {
+  getAllUsers,
+  getCurrentWorkspaceId,
+} from "@appsmith/selectors/workspaceSelectors";
 import { connect, useDispatch, useSelector } from "react-redux";
 import DeployLinkButtonDialog from "components/designSystems/appsmith/header/DeployLinkButton";
-import { EditInteractionKind, SavingState } from "components/ads/EditableText";
+import { EditInteractionKind, SavingState } from "design-system";
 import { updateApplication } from "actions/applicationActions";
 import {
   getApplicationList,
@@ -37,36 +37,37 @@ import EditorAppName from "./EditorAppName";
 import ProfileDropdown from "pages/common/ProfileDropdown";
 import { getCurrentUser } from "selectors/usersSelectors";
 import { ANONYMOUS_USERNAME, User } from "constants/userConstants";
-import Button, { Size } from "components/ads/Button";
-import Icon, { IconSize } from "components/ads/Icon";
+import {
+  Button,
+  getTypographyByKey,
+  Icon,
+  IconSize,
+  Size,
+  TooltipComponent,
+} from "design-system";
 import { Profile } from "pages/common/ProfileImage";
-import { getTypographyByKey } from "constants/DefaultTheme";
 import HelpBar from "components/editorComponents/GlobalSearch/HelpBar";
 import HelpButton from "./HelpButton";
 import { getTheme, ThemeMode } from "selectors/themeSelectors";
-import ToggleModeButton, {
-  useHideComments,
-} from "pages/Editor/ToggleModeButton";
+import ToggleModeButton from "pages/Editor/ToggleModeButton";
 import { Colors } from "constants/Colors";
 import { snipingModeSelector } from "selectors/editorSelectors";
-import { setSnipingMode as setSnipingModeAction } from "actions/propertyPaneActions";
-import { useLocation } from "react-router";
 import { showConnectGitModal } from "actions/gitSyncActions";
 import RealtimeAppEditors from "./RealtimeAppEditors";
 import { EditorSaveIndicator } from "./EditorSaveIndicator";
-import getFeatureFlags from "utils/featureFlags";
 
 import { retryPromise } from "utils/AppsmithUtils";
-import { fetchUsersForOrg } from "actions/orgActions";
-import { OrgUser } from "constants/orgConstants";
+import { fetchUsersForWorkspace } from "@appsmith/actions/workspaceActions";
+import { WorkspaceUser } from "@appsmith/constants/workspaceConstants";
 
-import { getIsGitConnected } from "../../selectors/gitSyncSelectors";
-import TooltipComponent from "components/ads/Tooltip";
-import { Position } from "@blueprintjs/core/lib/esnext/common";
+import { getIsGitConnected } from "selectors/gitSyncSelectors";
 import {
   CLOSE_ENTITY_EXPLORER_MESSAGE,
   createMessage,
   DEPLOY_BUTTON_TOOLTIP,
+  DEPLOY_MENU_OPTION,
+  INVITE_USERS_MESSAGE,
+  INVITE_USERS_PLACEHOLDER,
   LOCK_ENTITY_EXPLORER_MESSAGE,
   LOGO_TOOLTIP,
   RENAME_APPLICATION_TOOLTIP,
@@ -82,10 +83,12 @@ import {
 } from "actions/explorerActions";
 import { ReactComponent as UnpinIcon } from "assets/icons/ads/double-arrow-right.svg";
 import { ReactComponent as PinIcon } from "assets/icons/ads/double-arrow-left.svg";
-import { isMac } from "utils/helpers";
+import { modText } from "utils/helpers";
 import Boxed from "./GuidedTour/Boxed";
 import EndTour from "./GuidedTour/EndTour";
 import { GUIDED_TOUR_STEPS } from "./GuidedTour/constants";
+import { viewerURL } from "RouteBuilder";
+import { useHref } from "./utils";
 
 const HeaderWrapper = styled.div`
   width: 100%;
@@ -97,7 +100,7 @@ const HeaderWrapper = styled.div`
   box-shadow: none;
   border-bottom: 1px solid ${(props) => props.theme.colors.menuBorder};
   & .editable-application-name {
-    ${(props) => getTypographyByKey(props, "h4")}
+    ${getTypographyByKey("h4")}
     color: ${(props) => props.theme.colors.header.appName};
   }
   & ${Profile} {
@@ -151,7 +154,7 @@ const ProfileDropdownContainer = styled.div``;
 const StyledInviteButton = styled(Button)`
   margin-right: ${(props) => props.theme.spaces[9]}px;
   height: ${(props) => props.theme.smallHeaderHeight};
-  ${(props) => getTypographyByKey(props, "btnLarge")}
+  ${getTypographyByKey("btnLarge")}
   padding: ${(props) => props.theme.spaces[2]}px;
 `;
 
@@ -185,9 +188,9 @@ const StyledDeployIcon = styled(Icon)`
   height: 20px;
   width: 20px;
   align-self: center;
-  background: ${(props) => props.theme.colors.header.shareBtnHighlight};
+  background: var(--ads-color-brand);
   &:hover {
-    background: rgb(191, 65, 9);
+    background: var(--ads-color-brand-hover);
   }
 `;
 
@@ -217,17 +220,17 @@ const HamburgerContainer = styled.div`
 type EditorHeaderProps = {
   pageSaveError?: boolean;
   pageName?: string;
-  pageId?: string;
+  pageId: string;
   isPublishing: boolean;
   publishedTime?: string;
-  orgId: string;
+  workspaceId: string;
   applicationId?: string;
-  currentApplication?: CurrentApplicationData;
+  currentApplication?: ApplicationPayload;
   isSaving: boolean;
   publishApplication: (appId: string) => void;
   lastUpdatedTime?: number;
   inOnboarding: boolean;
-  sharedUserList: OrgUser[];
+  sharedUserList: WorkspaceUser[];
   currentUser?: User;
 };
 
@@ -249,11 +252,10 @@ export function EditorHeader(props: EditorHeaderProps) {
     applicationId,
     currentApplication,
     isPublishing,
-    orgId,
     pageId,
     publishApplication,
+    workspaceId,
   } = props;
-  const location = useLocation();
   const dispatch = useDispatch();
   const isSnipingMode = useSelector(snipingModeSelector);
   const isSavingName = useSelector(getIsSavingAppName);
@@ -262,17 +264,8 @@ export function EditorHeader(props: EditorHeaderProps) {
   const isErroredSavingName = useSelector(getIsErroredSavingAppName);
   const applicationList = useSelector(getApplicationList);
   const user = useSelector(getCurrentUser);
-  const shouldHideComments = useHideComments();
   const isPreviewMode = useSelector(previewModeSelector);
-
-  useEffect(() => {
-    if (window.location.href) {
-      const searchParams = new URL(window.location.href).searchParams;
-      const isSnipingMode = searchParams.get("isSnipingMode");
-      const updatedIsSnipingMode = isSnipingMode === "true";
-      dispatch(setSnipingModeAction(updatedIsSnipingMode));
-    }
-  }, [location]);
+  const deployLink = useHref(viewerURL, { pageId });
 
   const [isPopoverOpen, setIsPopoverOpen] = useState<boolean>(false);
 
@@ -301,7 +294,7 @@ export function EditorHeader(props: EditorHeaderProps) {
 
   const handleClickDeploy = useCallback(
     (fromDeploy?: boolean) => {
-      if (getFeatureFlags().GIT && isGitConnected) {
+      if (isGitConnected) {
         dispatch(showConnectGitModal());
         AnalyticsUtil.logEvent("GS_DEPLOY_GIT_CLICK", {
           source: fromDeploy
@@ -312,7 +305,7 @@ export function EditorHeader(props: EditorHeaderProps) {
         handlePublish();
       }
     },
-    [getFeatureFlags().GIT, dispatch, handlePublish],
+    [dispatch, handlePublish],
   );
 
   /**
@@ -331,29 +324,35 @@ export function EditorHeader(props: EditorHeaderProps) {
 
   //Fetch all users for the application to show the share button tooltip
   useEffect(() => {
-    if (orgId) {
-      dispatch(fetchUsersForOrg(orgId));
+    if (workspaceId) {
+      dispatch(fetchUsersForWorkspace(workspaceId));
     }
-  }, [orgId]);
+  }, [workspaceId]);
   const filteredSharedUserList = props.sharedUserList.filter(
     (user) => user.username !== props.currentUser?.username,
   );
 
   return (
     <ThemeProvider theme={theme}>
-      <HeaderWrapper className="pr-3">
+      <HeaderWrapper className="pr-3" data-testid="t--appsmith-editor-header">
         <HeaderSection className="space-x-3">
-          <HamburgerContainer className="text-gray-800 transform transition-all duration-400 relative p-0 flex items-center justify-center">
+          <HamburgerContainer
+            className={classNames({
+              "relative flex items-center justify-center p-0 text-gray-800 transition-all transform duration-400": true,
+              "-translate-x-full opacity-0": isPreviewMode,
+              "translate-x-0 opacity-100": !isPreviewMode,
+            })}
+          >
             <TooltipComponent
               content={
-                <div className="flex justify-between items-center">
+                <div className="flex items-center justify-between">
                   <span>
                     {!pinned
                       ? createMessage(LOCK_ENTITY_EXPLORER_MESSAGE)
                       : createMessage(CLOSE_ENTITY_EXPLORER_MESSAGE)}
                   </span>
                   <span className="ml-4 text-xs text-gray-300">
-                    {isMac() ? "Cmd" : "Ctrl"} + /
+                    {modText()} /
                   </span>
                 </div>
               }
@@ -363,7 +362,7 @@ export function EditorHeader(props: EditorHeaderProps) {
                 className="relative w-4 h-4 text-trueGray-600 group t--pin-entity-explorer"
                 onMouseEnter={onMenuHover}
               >
-                <MenuIcon className="absolute w-4 h-4 transition-opacity fill-current cursor-pointer group-hover:opacity-0" />
+                <MenuIcon className="absolute w-4 h-4 transition-opacity cursor-pointer fill-current group-hover:opacity-0" />
                 {!pinned && (
                   <UnpinIcon
                     className="absolute w-4 h-4 transition-opacity opacity-0 cursor-pointer fill-current group-hover:opacity-100"
@@ -382,7 +381,7 @@ export function EditorHeader(props: EditorHeaderProps) {
           <TooltipComponent
             content={createMessage(LOGO_TOOLTIP)}
             hoverOpenDelay={TOOLTIP_HOVER_ON_DELAY}
-            position={Position.BOTTOM_LEFT}
+            position="bottom-left"
           >
             <AppsmithLink to={APPLICATIONS_URL}>
               <img
@@ -399,20 +398,15 @@ export function EditorHeader(props: EditorHeaderProps) {
             disabled={isPopoverOpen}
             hoverOpenDelay={TOOLTIP_HOVER_ON_DELAY}
             openOnTargetFocus={false}
-            position={Position.BOTTOM}
+            position="bottom"
           >
             <EditorAppName
               applicationId={applicationId}
               className="t--application-name editable-application-name max-w-48"
-              currentDeployLink={getApplicationViewerPageURL({
-                applicationId: props.applicationId,
-                pageId,
-              })}
               defaultSavingState={
                 isSavingName ? SavingState.STARTED : SavingState.NOT_STARTED
               }
               defaultValue={currentApplication?.name || ""}
-              deploy={() => handleClickDeploy(false)}
               editInteractionKind={EditInteractionKind.SINGLE}
               fill
               isError={isErroredSavingName}
@@ -430,9 +424,7 @@ export function EditorHeader(props: EditorHeaderProps) {
               setIsPopoverOpen={setIsPopoverOpen}
             />
           </TooltipComponent>
-          {!shouldHideComments && (
-            <ToggleModeButton showSelectedMode={!isPopoverOpen} />
-          )}
+          <ToggleModeButton showSelectedMode={!isPopoverOpen} />
         </HeaderSection>
         <HeaderSection
           className={classNames({
@@ -460,7 +452,8 @@ export function EditorHeader(props: EditorHeaderProps) {
                 bgColor: Colors.GEYSER_LIGHT,
               }}
               isOpen={showAppInviteUsersDialog}
-              orgId={orgId}
+              message={createMessage(INVITE_USERS_MESSAGE)}
+              placeholder={createMessage(INVITE_USERS_PLACEHOLDER)}
               title={
                 currentApplication
                   ? currentApplication.name
@@ -478,17 +471,18 @@ export function EditorHeader(props: EditorHeaderProps) {
                       : createMessage(SHARE_BUTTON_TOOLTIP)
                   }
                   hoverOpenDelay={TOOLTIP_HOVER_ON_DELAY}
-                  position={Position.BOTTOM}
+                  position="bottom"
                 >
                   <ShareButtonComponent />
                 </TooltipComponent>
               }
+              workspaceId={workspaceId}
             />
             <DeploySection>
               <TooltipComponent
                 content={createMessage(DEPLOY_BUTTON_TOOLTIP)}
                 hoverOpenDelay={TOOLTIP_HOVER_ON_DELAY}
-                position={Position.BOTTOM_RIGHT}
+                position="bottom-right"
               >
                 <StyledDeployButton
                   className="t--application-publish-btn"
@@ -496,18 +490,15 @@ export function EditorHeader(props: EditorHeaderProps) {
                   isLoading={isPublishing}
                   onClick={() => handleClickDeploy(true)}
                   size={Size.small}
-                  text={"Deploy"}
+                  text={DEPLOY_MENU_OPTION()}
                 />
               </TooltipComponent>
 
               <DeployLinkButtonDialog
-                link={getApplicationViewerPageURL({
-                  applicationId: props.applicationId,
-                  pageId,
-                })}
+                link={deployLink}
                 trigger={
                   <StyledDeployIcon
-                    fillColor="#fff"
+                    fillColor="var(--ads-color-brand-text)"
                     name={"down-arrow"}
                     size={IconSize.XXL}
                   />
@@ -542,11 +533,11 @@ const theme = getTheme(ThemeMode.LIGHT);
 
 const mapStateToProps = (state: AppState) => ({
   pageName: state.ui.editor.currentPageName,
-  orgId: getCurrentOrgId(state),
+  workspaceId: getCurrentWorkspaceId(state),
   applicationId: getCurrentApplicationId(state),
   currentApplication: state.ui.applications.currentApplication,
   isPublishing: getIsPublishingApplication(state),
-  pageId: getCurrentPageId(state),
+  pageId: getCurrentPageId(state) as string,
   sharedUserList: getAllUsers(state),
   currentUser: getCurrentUser(state),
 });

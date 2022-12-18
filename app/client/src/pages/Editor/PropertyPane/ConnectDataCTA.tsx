@@ -1,49 +1,43 @@
-import Button, { Category, Size } from "components/ads/Button";
 import React, { useCallback } from "react";
-import { AppState } from "reducers";
+import { Button, Category, getTypographyByKey, Size } from "design-system";
+import { AppState } from "@appsmith/reducers";
 import styled from "styled-components";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  getCurrentApplicationId,
-  getCurrentPageId,
-} from "selectors/editorSelectors";
-import {
-  INTEGRATION_EDITOR_MODES,
-  INTEGRATION_EDITOR_URL,
-  INTEGRATION_TABS,
-} from "constants/routes";
+import { INTEGRATION_EDITOR_MODES, INTEGRATION_TABS } from "constants/routes";
 import history from "utils/history";
 import {
   setGlobalSearchQuery,
   toggleShowGlobalSearchModal,
 } from "actions/globalSearchActions";
 import AnalyticsUtil from "utils/AnalyticsUtil";
-import { getTypographyByKey } from "constants/DefaultTheme";
 import { WidgetType } from "constants/WidgetConstants";
+import { integrationEditorURL } from "RouteBuilder";
+import { getCurrentPageId } from "selectors/editorSelectors";
 
 const StyledDiv = styled.div`
   color: ${(props) => props.theme.colors.propertyPane.ctaTextColor};
-  ${(props) => getTypographyByKey(props, "p1")}
+  ${getTypographyByKey("p1")}
   background-color: ${(props) =>
     props.theme.colors.propertyPane.ctaBackgroundColor};
   padding: ${(props) => props.theme.spaces[3]}px ${(props) =>
   props.theme.spaces[7]}px;
-  margin: ${(props) => props.theme.spaces[2]}px 0px;
+  margin: ${(props) => props.theme.spaces[2]}px 0.75rem;
 
-  a:first-child {
+  button:first-child {
     margin-top: ${(props) => props.theme.spaces[2]}px;
+    width: 100%;
   }
-  a:nth-child(2) {
+  button:nth-child(2) {
     border: none;
     background-color: transparent;
     text-transform: none;
     justify-content: flex-start;
     padding: 0px;
     color: ${(props) => props.theme.colors.propertyPane.ctaLearnMoreTextColor};
-    ${(props) => getTypographyByKey(props, "p3")}
+    ${getTypographyByKey("p3")}
     margin-top: ${(props) => props.theme.spaces[2]}px;
 
-    :hover {
+    :hover, :focus {
       text-decoration: underline;
     }
   }
@@ -59,10 +53,8 @@ type ConnectDataCTAProps = {
 };
 
 function ConnectDataCTA(props: ConnectDataCTAProps) {
-  const applicationId = useSelector(getCurrentApplicationId);
-  const pageId = useSelector(getCurrentPageId);
   const dispatch = useDispatch();
-
+  const pageId: string = useSelector(getCurrentPageId);
   const openHelpModal = useCallback(() => {
     dispatch(setGlobalSearchQuery("Connecting to Data Sources"));
     dispatch(toggleShowGlobalSearchModal());
@@ -74,12 +66,11 @@ function ConnectDataCTA(props: ConnectDataCTAProps) {
   const onClick = () => {
     const { widgetId, widgetTitle, widgetType } = props;
     history.push(
-      INTEGRATION_EDITOR_URL(
-        applicationId,
+      integrationEditorURL({
         pageId,
-        INTEGRATION_TABS.NEW,
-        INTEGRATION_EDITOR_MODES.AUTO,
-      ),
+        selectedTab: INTEGRATION_TABS.NEW,
+        params: { mode: INTEGRATION_EDITOR_MODES.AUTO },
+      }),
     );
     AnalyticsUtil.logEvent("CONNECT_DATA_CLICK", {
       widgetTitle,
@@ -95,15 +86,19 @@ function ConnectDataCTA(props: ConnectDataCTAProps) {
         category={Category.primary}
         onClick={onClick}
         size={Size.large}
+        tabIndex={0}
+        tag="button"
         text="CONNECT DATA"
       />
       <Button
-        category={Category.tertiary}
+        category={Category.secondary}
         onClick={openHelpModal}
+        tabIndex={0}
+        tag="button"
         text="Learn more"
       />
     </StyledDiv>
   );
 }
 
-export default ConnectDataCTA;
+export default React.memo(ConnectDataCTA);

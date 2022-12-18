@@ -1,11 +1,10 @@
-const commonlocators = require("../../../../locators/commonlocators.json");
-const dsl = require("../../../../fixtures/listwidgetdsl.json");
-const pages = require("../../../../locators/Pages.json");
-const apiPage = require("../../../../locators/ApiEditor.json");
-const publishPage = require("../../../../locators/publishWidgetspage.json");
+/// <reference types="Cypress" />
 
-describe("Test Create Api and Bind to Table widget", function() {
-  let apiData;
+const dsl = require("../../../../fixtures/listwidgetdsl.json");
+const publishPage = require("../../../../locators/publishWidgetspage.json");
+import apiPage from "../../../../locators/ApiEditor";
+
+describe("Test Create Api and Bind to List widget", function() {
   let valueToTest;
   before(() => {
     cy.addDsl(dsl);
@@ -24,7 +23,6 @@ describe("Test Create Api and Bind to Table widget", function() {
           .split('"')
           .join("")}`;
         cy.log(valueToTest);
-        apiData = valueToTest;
         cy.log("val1:" + valueToTest);
       });
   });
@@ -33,7 +31,6 @@ describe("Test Create Api and Bind to Table widget", function() {
     cy.SearchEntityandOpen("List1");
     cy.testJsontext("items", "{{Api1.data.users}}");
     cy.get(".t--draggable-textwidget span").should("have.length", 8);
-
     cy.get(".t--draggable-textwidget span")
       .first()
       .invoke("text")
@@ -41,6 +38,16 @@ describe("Test Create Api and Bind to Table widget", function() {
         expect(text).to.equal(valueToTest);
       });
     cy.PublishtheApp();
+
+    cy.waitUntil(
+      () => cy.get(".t--widget-textwidget span").should("be.visible"),
+      {
+        errorMsg: "Pubish app page is not loaded evn after 20 secs",
+        timeout: 20000,
+        interval: 1000,
+      },
+    ).then(() => cy.wait(500));
+
     cy.get(".t--widget-textwidget span").should("have.length", 8);
     cy.get(".t--widget-textwidget span")
       .first()
@@ -53,6 +60,7 @@ describe("Test Create Api and Bind to Table widget", function() {
   it("Test_Validate the list widget ", function() {
     cy.get(publishPage.backToEditor).click({ force: true });
     cy.SearchEntityandOpen("List1");
+    cy.moveToStyleTab();
     cy.testJsontext("itemspacing\\(px\\)", "50");
     cy.get(".t--draggable-textwidget span").should("have.length", 6);
     cy.get(".t--draggable-textwidget span")
@@ -62,6 +70,14 @@ describe("Test Create Api and Bind to Table widget", function() {
         expect(text).to.equal(valueToTest);
       });
     cy.PublishtheApp();
+    cy.waitUntil(
+      () => cy.get(".t--widget-textwidget span").should("be.visible"),
+      {
+        errorMsg: "Pubish app page is not loaded evn after 20 secs",
+        timeout: 20000,
+        interval: 1000,
+      },
+    ).then(() => cy.wait(500));
     cy.get(".t--widget-textwidget span").should("have.length", 6);
     cy.get(".t--widget-textwidget span")
       .first()

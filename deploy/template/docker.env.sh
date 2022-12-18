@@ -35,6 +35,11 @@ APPSMITH_MAIL_ENABLED=false
 # APPSMITH_OAUTH2_GITHUB_CLIENT_SECRET=
 # *********************************
 
+# ******** Form Login/Signup ********
+# APPSMITH_FORM_LOGIN_DISABLED=
+# APPSMITH_SIGNUP_DISABLED=
+# ***********************************
+
 # ******** Google Maps ***********
 # APPSMITH_GOOGLE_MAPS_API_KEY=
 # ********************************
@@ -74,5 +79,7 @@ APPSMITH_DISABLE_TELEMETRY=$disable_telemetry
 # *******************************
 
 # APPSMITH_PLUGIN_MAX_RESPONSE_SIZE_MB=5
+
+APPSMITH_DISABLE_IFRAME_WIDGET_SANDBOX=false
 
 EOF

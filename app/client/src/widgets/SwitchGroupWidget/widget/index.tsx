@@ -1,22 +1,26 @@
 import React from "react";
 import { Alignment } from "@blueprintjs/core";
-
+import { isString, xor } from "lodash";
 import BaseWidget, { WidgetProps, WidgetState } from "widgets/BaseWidget";
 import { DerivedPropertiesMap } from "utils/WidgetFactory";
 import { ValidationTypes } from "constants/WidgetValidation";
 import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
 import { EvaluationSubstitutionType } from "entities/DataTree/dataTreeFactory";
-
+import { LabelPosition } from "components/constants";
+import { TextSize } from "constants/WidgetConstants";
+import { GRID_DENSITY_MIGRATION_V1 } from "widgets/constants";
+import { Stylesheet } from "entities/AppTheming";
 import SwitchGroupComponent, { OptionProps } from "../component";
+import { isAutoHeightEnabledForWidget } from "widgets/WidgetUtils";
 
 class SwitchGroupWidget extends BaseWidget<
   SwitchGroupWidgetProps,
   WidgetState
 > {
-  static getPropertyPaneConfig() {
+  static getPropertyPaneContentConfig() {
     return [
       {
-        sectionName: "General",
+        sectionName: "Data",
         children: [
           {
             helpText:
@@ -79,17 +83,84 @@ class SwitchGroupWidget extends BaseWidget<
               },
             },
           },
+        ],
+      },
+      {
+        sectionName: "Label",
+        children: [
           {
-            propertyName: "isInline",
+            helpText: "Sets the label text of the widget",
+            propertyName: "labelText",
+            label: "Text",
+            controlType: "INPUT_TEXT",
+            placeholderText: "Enter label text",
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            helpText: "Sets the label position of the widget",
+            propertyName: "labelPosition",
+            label: "Position",
+            controlType: "ICON_TABS",
+            fullWidth: true,
+            options: [
+              { label: "Auto", value: LabelPosition.Auto },
+              { label: "Left", value: LabelPosition.Left },
+              { label: "Top", value: LabelPosition.Top },
+            ],
+            defaultValue: LabelPosition.Top,
+            isBindProperty: false,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            helpText: "Sets the label alignment of the widget",
+            propertyName: "labelAlignment",
+            label: "Alignment",
+            controlType: "LABEL_ALIGNMENT_OPTIONS",
+            options: [
+              {
+                icon: "LEFT_ALIGN",
+                value: Alignment.LEFT,
+              },
+              {
+                icon: "RIGHT_ALIGN",
+                value: Alignment.RIGHT,
+              },
+            ],
+            isBindProperty: false,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+            hidden: (props: SwitchGroupWidgetProps) =>
+              props.labelPosition !== LabelPosition.Left,
+            dependencies: ["labelPosition"],
+          },
+          {
             helpText:
-              "Whether switches are to be displayed inline horizontally",
-            label: "Inline",
-            controlType: "SWITCH",
+              "Sets the label width of the widget as the number of columns",
+            propertyName: "labelWidth",
+            label: "Width (in columns)",
+            controlType: "NUMERIC_INPUT",
             isJSConvertible: true,
             isBindProperty: true,
             isTriggerProperty: false,
-            validation: { type: ValidationTypes.BOOLEAN },
+            min: 0,
+            validation: {
+              type: ValidationTypes.NUMBER,
+              params: {
+                natural: true,
+              },
+            },
+            hidden: (props: SwitchGroupWidgetProps) =>
+              props.labelPosition !== LabelPosition.Left,
+            dependencies: ["labelPosition"],
           },
+        ],
+      },
+      {
+        sectionName: "Validations",
+        children: [
           {
             propertyName: "isRequired",
             label: "Required",
@@ -99,6 +170,21 @@ class SwitchGroupWidget extends BaseWidget<
             isBindProperty: true,
             isTriggerProperty: false,
             validation: { type: ValidationTypes.BOOLEAN },
+          },
+        ],
+      },
+      {
+        sectionName: "General",
+        children: [
+          {
+            helpText: "Show help text or details about current input",
+            propertyName: "labelTooltip",
+            label: "Tooltip",
+            controlType: "INPUT_TEXT",
+            placeholderText: "Value must be atleast 6 chars",
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
           },
           {
             propertyName: "isVisible",
@@ -121,6 +207,17 @@ class SwitchGroupWidget extends BaseWidget<
             validation: { type: ValidationTypes.BOOLEAN },
           },
           {
+            propertyName: "isInline",
+            helpText:
+              "Whether switches are to be displayed inline horizontally",
+            label: "Inline",
+            controlType: "SWITCH",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.BOOLEAN },
+          },
+          {
             propertyName: "animateLoading",
             label: "Animate Loading",
             controlType: "SWITCH",
@@ -131,28 +228,10 @@ class SwitchGroupWidget extends BaseWidget<
             isTriggerProperty: false,
             validation: { type: ValidationTypes.BOOLEAN },
           },
-          {
-            propertyName: "alignment",
-            helpText: "Sets the alignment of the widget",
-            label: "Alignment",
-            controlType: "DROP_DOWN",
-            isBindProperty: true,
-            isTriggerProperty: false,
-            options: [
-              {
-                label: "Left",
-                value: Alignment.LEFT,
-              },
-              {
-                label: "Right",
-                value: Alignment.RIGHT,
-              },
-            ],
-          },
         ],
       },
       {
-        sectionName: "Actions",
+        sectionName: "Events",
         children: [
           {
             helpText:
@@ -169,6 +248,134 @@ class SwitchGroupWidget extends BaseWidget<
     ];
   }
 
+  static getPropertyPaneStyleConfig() {
+    return [
+      {
+        sectionName: "Label Styles",
+        children: [
+          {
+            propertyName: "labelTextColor",
+            label: "Font Color",
+            helpText: "Control the color of the label associated",
+            controlType: "COLOR_PICKER",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            propertyName: "labelTextSize",
+            label: "Font Size",
+            helpText: "Control the font size of the label associated",
+            controlType: "DROP_DOWN",
+            defaultValue: "0.875rem",
+            options: [
+              {
+                label: "S",
+                value: "0.875rem",
+                subText: "0.875rem",
+              },
+              {
+                label: "M",
+                value: "1rem",
+                subText: "1rem",
+              },
+              {
+                label: "L",
+                value: "1.25rem",
+                subText: "1.25rem",
+              },
+              {
+                label: "XL",
+                value: "1.875rem",
+                subText: "1.875rem",
+              },
+              {
+                label: "XXL",
+                value: "3rem",
+                subText: "3rem",
+              },
+              {
+                label: "3XL",
+                value: "3.75rem",
+                subText: "3.75rem",
+              },
+            ],
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            propertyName: "labelStyle",
+            label: "Emphasis",
+            helpText: "Control if the label should be bold or italics",
+            controlType: "BUTTON_TABS",
+            options: [
+              {
+                icon: "BOLD_FONT",
+                value: "BOLD",
+              },
+              {
+                icon: "ITALICS_FONT",
+                value: "ITALIC",
+              },
+            ],
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+        ],
+      },
+      {
+        sectionName: "General",
+        children: [
+          {
+            propertyName: "alignment",
+            helpText: "Sets the alignment of the widget",
+            label: "Alignment",
+            controlType: "ICON_TABS",
+            fullWidth: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            options: [
+              {
+                label: "Left",
+                value: Alignment.LEFT,
+              },
+              {
+                label: "Right",
+                value: Alignment.RIGHT,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        sectionName: "Color",
+        children: [
+          {
+            propertyName: "accentColor",
+            helpText: "Sets the background color of the widget",
+            label: "Accent Color",
+            controlType: "COLOR_PICKER",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+        ],
+      },
+    ];
+  }
+
+  static getStylesheetConfig(): Stylesheet {
+    return {
+      accentColor: "{{appsmith.theme.colors.primaryColor}}",
+    };
+  }
+
   static getDefaultPropertiesMap(): Record<string, string> {
     return {
       selectedValuesArray: "defaultSelectedValues",
@@ -178,6 +385,7 @@ class SwitchGroupWidget extends BaseWidget<
   static getMetaPropertiesMap(): Record<string, any> {
     return {
       selectedValuesArray: undefined,
+      isDirty: false,
     };
   }
 
@@ -189,6 +397,7 @@ class SwitchGroupWidget extends BaseWidget<
           selectedValue => this.options.map(option => option.value).includes(selectedValue)
         )
       }}`,
+      value: `{{this.selectedValues}}`,
     };
   }
 
@@ -196,29 +405,78 @@ class SwitchGroupWidget extends BaseWidget<
     return "SWITCH_GROUP_WIDGET";
   }
 
+  componentDidUpdate(prevProps: SwitchGroupWidgetProps): void {
+    if (
+      xor(this.props.defaultSelectedValues, prevProps.defaultSelectedValues)
+        .length > 0
+    ) {
+      if (this.props.isDirty) {
+        this.props.updateWidgetMetaProperty("isDirty", false);
+      }
+
+      this.props.updateWidgetMetaProperty(
+        "selectedValuesArray",
+        this.props.defaultSelectedValues,
+      );
+    }
+  }
+
   getPageView() {
     const {
+      accentColor,
       alignment,
+      bottomRow,
       isDisabled,
       isInline,
       isRequired,
       isValid,
+      labelAlignment,
+      labelPosition,
+      labelStyle,
+      labelText,
+      labelTextColor,
+      labelTextSize,
+      labelTooltip,
       options,
-      parentRowSpace,
       selectedValues,
+      topRow,
+      widgetId,
     } = this.props;
+
+    const { componentHeight } = this.getComponentDimensions();
+
+    // TODO(abhinav): Not sure why we have to do this.
+    // Check with the App Viewers Pod
+    let _options = options;
+    if (isString(options)) {
+      try {
+        _options = JSON.parse(options as string);
+      } catch (e) {}
+    }
 
     return (
       <SwitchGroupComponent
+        accentColor={accentColor}
         alignment={alignment}
+        compactMode={!((bottomRow - topRow) / GRID_DENSITY_MIGRATION_V1 > 1)}
         disabled={isDisabled}
+        height={componentHeight}
         inline={isInline}
+        isDynamicHeightEnabled={isAutoHeightEnabledForWidget(this.props)}
+        labelAlignment={labelAlignment}
+        labelPosition={labelPosition}
+        labelStyle={labelStyle}
+        labelText={labelText}
+        labelTextColor={labelTextColor}
+        labelTextSize={labelTextSize}
+        labelTooltip={labelTooltip}
+        labelWidth={this.getLabelWidth()}
         onChange={this.handleSwitchStateChange}
-        options={options}
+        options={_options}
         required={isRequired}
-        rowSpace={parentRowSpace}
         selected={selectedValues}
         valid={isValid}
+        widgetId={widgetId}
       />
     );
   }
@@ -233,6 +491,10 @@ class SwitchGroupWidget extends BaseWidget<
         selectedValuesArray = selectedValuesArray.filter(
           (item: string) => item !== value,
         );
+      }
+
+      if (!this.props.isDirty) {
+        this.props.updateWidgetMetaProperty("isDirty", true);
       }
 
       this.props.updateWidgetMetaProperty(
@@ -253,12 +515,21 @@ class SwitchGroupWidget extends BaseWidget<
 export interface SwitchGroupWidgetProps extends WidgetProps {
   options: OptionProps[];
   defaultSelectedValues: string[];
+  selectedValuesArray: string[];
   isInline: boolean;
-  isRequired?: boolean;
-  isValid?: boolean;
-  isDisabled?: boolean;
+  isRequired: boolean;
+  isValid: boolean;
+  isDisabled: boolean;
   alignment: Alignment;
-  onSelectionChange?: boolean;
+  labelText?: string;
+  labelPosition?: LabelPosition;
+  labelAlignment?: Alignment;
+  labelWidth?: number;
+  labelTextColor?: string;
+  labelTextSize?: TextSize;
+  labelStyle?: string;
+  onSelectionChange?: string;
+  accentColor: string;
 }
 
 export default SwitchGroupWidget;

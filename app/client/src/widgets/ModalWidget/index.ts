@@ -1,10 +1,16 @@
-import { ButtonVariantTypes } from "components/constants";
+import { IconNames } from "@blueprintjs/icons";
+import { Colors } from "constants/Colors";
+import {
+  ButtonBorderRadiusTypes,
+  ButtonVariantTypes,
+} from "components/constants";
 import { GridDefaults } from "constants/WidgetConstants";
 import { WidgetProps } from "widgets/BaseWidget";
 import {
   BlueprintOperationTypes,
   FlattenedWidgetProps,
 } from "widgets/constants";
+
 import IconSVG from "./icon.svg";
 import Widget from "./widget";
 
@@ -14,11 +20,19 @@ export const CONFIG = {
   iconSVG: IconSVG,
   needsMeta: true,
   isCanvas: true,
+  features: {
+    dynamicHeight: {
+      sectionIndex: 0,
+      active: true,
+    },
+  },
+  searchTags: ["dialog", "popup", "notification"],
   defaults: {
     rows: 24,
     columns: 24,
     width: 456,
     height: GridDefaults.DEFAULT_GRID_ROW_HEIGHT * 24,
+    minDynamicHeight: 24,
     canEscapeKeyClose: true,
     animateLoading: true,
     // detachFromLayout is set true for widgets that are not bound to the widgets within the layout.
@@ -45,16 +59,18 @@ export const CONFIG = {
             blueprint: {
               view: [
                 {
-                  type: "ICON_WIDGET",
-                  position: { left: 56, top: 1 },
+                  type: "ICON_BUTTON_WIDGET",
+                  position: { left: 58, top: 0 },
                   size: {
                     rows: 4,
-                    cols: 8,
+                    cols: 6,
                   },
                   props: {
-                    iconName: "cross",
+                    buttonColor: Colors.GREY_7,
+                    buttonVariant: ButtonVariantTypes.TERTIARY,
+                    borderRadius: ButtonBorderRadiusTypes.SHARP,
+                    iconName: IconNames.CROSS,
                     iconSize: 24,
-                    color: "#040627",
                     version: 1,
                   },
                 },
@@ -67,19 +83,19 @@ export const CONFIG = {
                   },
                   props: {
                     text: "Modal Title",
-                    fontSize: "HEADING1",
+                    fontSize: "1.25rem",
                     version: 1,
                   },
                 },
                 {
                   type: "BUTTON_WIDGET",
                   position: {
-                    left: 36,
-                    top: 16,
+                    left: 31,
+                    top: 18,
                   },
                   size: {
                     rows: 4,
-                    cols: 12,
+                    cols: 16,
                   },
                   props: {
                     text: "Close",
@@ -91,12 +107,12 @@ export const CONFIG = {
                 {
                   type: "BUTTON_WIDGET",
                   position: {
-                    left: 48,
-                    top: 16,
+                    left: 47,
+                    top: 18,
                   },
                   size: {
                     rows: 4,
-                    cols: 12,
+                    cols: 16,
                   },
                   props: {
                     text: "Confirm",
@@ -116,7 +132,7 @@ export const CONFIG = {
                     const iconChild =
                       widget.children &&
                       widget.children.find(
-                        (child) => child.type === "ICON_WIDGET",
+                        (child) => child.type === "ICON_BUTTON_WIDGET",
                       );
 
                     if (iconChild && parent) {
@@ -168,6 +184,9 @@ export const CONFIG = {
     default: Widget.getDefaultPropertiesMap(),
     meta: Widget.getMetaPropertiesMap(),
     config: Widget.getPropertyPaneConfig(),
+    contentConfig: Widget.getPropertyPaneContentConfig(),
+    styleConfig: Widget.getPropertyPaneStyleConfig(),
+    stylesheetConfig: Widget.getStylesheetConfig(),
   },
 };
 

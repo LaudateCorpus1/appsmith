@@ -2,8 +2,10 @@ package com.appsmith.external.helpers;
 
 import com.appsmith.external.constants.DataType;
 import com.appsmith.external.constants.DisplayDataType;
+import com.appsmith.external.datatypes.AppsmithType;
 import com.appsmith.external.exceptions.pluginExceptions.AppsmithPluginError;
 import com.appsmith.external.exceptions.pluginExceptions.AppsmithPluginException;
+import com.appsmith.external.models.Param;
 import com.appsmith.external.models.ParsedDataType;
 import com.appsmith.external.plugins.SmartSubstitutionInterface;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -49,7 +51,7 @@ public class DataTypeStringUtils {
 
     private static Pattern questionPattern = Pattern.compile(regexForQuestionMark);
 
-    private static Pattern placeholderPattern = Pattern.compile(APPSMITH_SUBSTITUTION_PLACEHOLDER);
+    public static Pattern placeholderPattern = Pattern.compile(APPSMITH_SUBSTITUTION_PLACEHOLDER);
 
     private static ObjectMapper objectMapper = new ObjectMapper();
 
@@ -58,7 +60,7 @@ public class DataTypeStringUtils {
     private static final TypeAdapter<JsonObject> strictGsonObjectAdapter =
             new Gson().getAdapter(JsonObject.class);
 
-
+    @Deprecated(since = "With the implementation of Data Type handling this function is marked as deprecated and is discouraged for further use")
     public static DataType stringToKnownDataTypeConverter(String input) {
 
         if (input == null) {
@@ -187,12 +189,33 @@ public class DataTypeStringUtils {
         return DataType.STRING;
     }
 
+    /**
+     *
+     * @param input input string which has a mustache expression that will be substituted by the replacement value
+     * @param replacement value that needs to be substituted in place of mustache expression
+     * @param replacementDataType nullable DataType that is used to provide Plugin Specific types, by setting this
+     *                            you can override the 'DataTypeStringUtils.stringToKnownDataTypeConverter(replacement)'
+     *                            default behavior.
+     * @param insertedParams keeps a list of tuple (replacement, data_type)
+     * @param smartSubstitutionUtils provides entry to plugin specific post-processing logic applied to replacement
+     *                               value before the final substitution happens
+     * @param param the binding parameter having the clientDataType to be used in the data type identification process
+     * @return
+     */
     public static String jsonSmartReplacementPlaceholderWithValue(String input,
                                                                   String replacement,
+                                                                  DataType replacementDataType,
                                                                   List<Map.Entry<String, String>> insertedParams,
-                                                                  SmartSubstitutionInterface smartSubstitutionUtils) {
+                                                                  SmartSubstitutionInterface smartSubstitutionUtils,
+                                                                  Param param) {
 
-        DataType dataType = DataTypeStringUtils.stringToKnownDataTypeConverter(replacement);
+        final DataType dataType;
+        if (replacementDataType == null) {
+            AppsmithType appsmithType = DataTypeServiceUtils.getAppsmithType(param.getClientDataType(), replacement);
+            dataType = appsmithType.type();
+        } else {
+            dataType = replacementDataType;
+        }
 
         Map.Entry<String, String> parameter = new SimpleEntry<>(replacement, dataType.toString());
         insertedParams.add(parameter);
@@ -211,6 +234,8 @@ public class DataTypeStringUtils {
                 try {
                     JSONArray jsonArray = (JSONArray) parser.parse(replacement);
                     updatedReplacement = String.valueOf(objectMapper.writeValueAsString(jsonArray));
+                    // Adding Matcher.quoteReplacement so that "/" and "$" in the string are escaped during replacement
+                    updatedReplacement = Matcher.quoteReplacement(updatedReplacement);
                 } catch (net.minidev.json.parser.ParseException | JsonProcessingException e) {
                     throw Exceptions.propagate(
                             new AppsmithPluginException(
@@ -240,6 +265,15 @@ public class DataTypeStringUtils {
             case BSON:
                 updatedReplacement = Matcher.quoteReplacement(replacement);
                 break;
+            case BSON_SPECIAL_DATA_TYPES:
+                /**
+                 * For this data type the replacement logic is handled via `sanitizeReplacement(...)` method.
+                 * Usually usage of special Mongo data types like `ObjectId` or `ISODate` falls into this category
+                 * (if it does not get detected as BSON). For complete list please check out `MongoSpecialDataTypes
+                 * .java`.
+                 */
+                updatedReplacement = replacement;
+                break;
             case DATE:
             case TIME:
             case ASCII:
@@ -262,7 +296,7 @@ public class DataTypeStringUtils {
         }
 
         if (smartSubstitutionUtils != null) {
-            updatedReplacement = smartSubstitutionUtils.sanitizeReplacement(updatedReplacement);
+            updatedReplacement = smartSubstitutionUtils.sanitizeReplacement(updatedReplacement, dataType);
         }
 
         input = placeholderPattern.matcher(input).replaceFirst(updatedReplacement);
@@ -283,27 +317,25 @@ public class DataTypeStringUtils {
 
     private static boolean isDisplayTypeTable(Object data) {
         if (data instanceof List) {
-            // Check if the data is a list of simple json objects i.e. all values in the key value pairs are simple
-            // objects or their wrappers.
-            return ((List)data).stream()
-                    .allMatch(item -> item instanceof Map
-                            && ((Map)item).entrySet().stream()
-                            .allMatch(e -> ((Map.Entry)e).getValue() == null ||
-                            isPrimitiveOrWrapper(((Map.Entry)e).getValue().getClass())));
+            // Check if the data is a list of json objects
+            return ((List) data).stream()
+                    .allMatch(item -> item instanceof Map);
         }
         else if (data instanceof JsonNode) {
-            // Check if the data is an array of simple json objects
+            // Check if the data is an array of json objects
             try {
-                objectMapper.convertValue(data, new TypeReference<List<Map<String, String>>>() {});
+                objectMapper.convertValue(data, new TypeReference<List<Map<String, Object>>>() {
+                });
                 return true;
             } catch (IllegalArgumentException e) {
                 return false;
             }
         }
         else if (data instanceof String) {
-            // Check if the data is an array of simple json objects
+            // Check if the data is an array of json objects
             try {
-                objectMapper.readValue((String)data, new TypeReference<List<Map<String, String>>>() {});
+                objectMapper.readValue((String) data, new TypeReference<List<Map<String, Object>>>() {
+                });
                 return true;
             } catch (IOException e) {
                 return false;

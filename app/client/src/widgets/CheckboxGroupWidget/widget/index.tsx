@@ -1,20 +1,25 @@
 import React from "react";
-import { compact } from "lodash";
-
+import { compact, xor } from "lodash";
+import { TextSize, WidgetType } from "constants/WidgetConstants";
+import { DerivedPropertiesMap } from "utils/WidgetFactory";
+import BaseWidget, { WidgetProps, WidgetState } from "widgets/BaseWidget";
+import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
+import { AutocompleteDataType } from "utils/autocomplete/CodemirrorTernService";
+import { EvaluationSubstitutionType } from "entities/DataTree/dataTreeFactory";
+import { Alignment } from "@blueprintjs/core";
+import { GRID_DENSITY_MIGRATION_V1 } from "widgets/constants";
+import CheckboxGroupComponent from "../component";
+import { OptionProps, SelectAllState, SelectAllStates } from "../constants";
+import { Stylesheet } from "entities/AppTheming";
 import {
   ValidationResponse,
   ValidationTypes,
 } from "constants/WidgetValidation";
-import { WidgetType } from "constants/WidgetConstants";
-import { DerivedPropertiesMap } from "utils/WidgetFactory";
-import BaseWidget, { WidgetProps, WidgetState } from "widgets/BaseWidget";
-import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
-import { AutocompleteDataType } from "utils/autocomplete/TernServer";
-import { EvaluationSubstitutionType } from "entities/DataTree/dataTreeFactory";
-import { CheckboxGroupAlignmentTypes } from "components/constants";
-
-import CheckboxGroupComponent from "../component";
-import { OptionProps, SelectAllState, SelectAllStates } from "../constants";
+import {
+  CheckboxGroupAlignmentTypes,
+  LabelPosition,
+} from "components/constants";
+import { isAutoHeightEnabledForWidget } from "widgets/WidgetUtils";
 
 export function defaultSelectedValuesValidation(
   value: unknown,
@@ -49,10 +54,10 @@ class CheckboxGroupWidget extends BaseWidget<
   CheckboxGroupWidgetProps,
   WidgetState
 > {
-  static getPropertyPaneConfig() {
+  static getPropertyPaneContentConfig() {
     return [
       {
-        sectionName: "General",
+        sectionName: "Data",
         children: [
           {
             helpText: "Displays a list of unique checkbox options",
@@ -115,6 +120,84 @@ class CheckboxGroupWidget extends BaseWidget<
               },
             },
           },
+        ],
+      },
+      {
+        sectionName: "Label",
+        children: [
+          {
+            helpText: "Sets the label text of the widget",
+            propertyName: "labelText",
+            label: "Text",
+            controlType: "INPUT_TEXT",
+            placeholderText: "Enter label text",
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            helpText: "Sets the label position of the widget",
+            propertyName: "labelPosition",
+            label: "Position",
+            controlType: "ICON_TABS",
+            fullWidth: true,
+            options: [
+              { label: "Auto", value: LabelPosition.Auto },
+              { label: "Left", value: LabelPosition.Left },
+              { label: "Top", value: LabelPosition.Top },
+            ],
+            defaultValue: LabelPosition.Top,
+            isBindProperty: false,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            helpText: "Sets the label alignment of the widget",
+            propertyName: "labelAlignment",
+            label: "Alignment",
+            controlType: "LABEL_ALIGNMENT_OPTIONS",
+            options: [
+              {
+                icon: "LEFT_ALIGN",
+                value: Alignment.LEFT,
+              },
+              {
+                icon: "RIGHT_ALIGN",
+                value: Alignment.RIGHT,
+              },
+            ],
+            isBindProperty: false,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+            hidden: (props: CheckboxGroupWidgetProps) =>
+              props.labelPosition !== LabelPosition.Left,
+            dependencies: ["labelPosition"],
+          },
+          {
+            helpText:
+              "Sets the label width of the widget as the number of columns",
+            propertyName: "labelWidth",
+            label: "Width (in columns)",
+            controlType: "NUMERIC_INPUT",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            min: 0,
+            validation: {
+              type: ValidationTypes.NUMBER,
+              params: {
+                natural: true,
+              },
+            },
+            hidden: (props: CheckboxGroupWidgetProps) =>
+              props.labelPosition !== LabelPosition.Left,
+            dependencies: ["labelPosition"],
+          },
+        ],
+      },
+      {
+        sectionName: "Validations",
+        children: [
           {
             propertyName: "isRequired",
             label: "Required",
@@ -126,6 +209,21 @@ class CheckboxGroupWidget extends BaseWidget<
             validation: {
               type: ValidationTypes.BOOLEAN,
             },
+          },
+        ],
+      },
+      {
+        sectionName: "General",
+        children: [
+          {
+            helpText: "Show help text or details about current input",
+            propertyName: "labelTooltip",
+            label: "Tooltip",
+            controlType: "INPUT_TEXT",
+            placeholderText: "Value must be atleast 6 chars",
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
           },
           {
             propertyName: "isVisible",
@@ -189,7 +287,104 @@ class CheckboxGroupWidget extends BaseWidget<
         ],
       },
       {
-        sectionName: "Styles",
+        sectionName: "Events",
+        children: [
+          {
+            helpText: "Triggers an action when the check state is changed",
+            propertyName: "onSelectionChange",
+            label: "onSelectionChange",
+            controlType: "ACTION_SELECTOR",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: true,
+          },
+        ],
+      },
+    ];
+  }
+
+  static getPropertyPaneStyleConfig() {
+    return [
+      {
+        sectionName: "Label Styles",
+        children: [
+          {
+            propertyName: "labelTextColor",
+            label: "Font Color",
+            helpText: "Control the color of the label associated",
+            controlType: "COLOR_PICKER",
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            propertyName: "labelTextSize",
+            label: "Font Size",
+            helpText: "Control the font size of the label associated",
+            controlType: "DROP_DOWN",
+            defaultValue: "0.875rem",
+            options: [
+              {
+                label: "S",
+                value: "0.875rem",
+                subText: "0.875rem",
+              },
+              {
+                label: "M",
+                value: "1rem",
+                subText: "1rem",
+              },
+              {
+                label: "L",
+                value: "1.25rem",
+                subText: "1.25rem",
+              },
+              {
+                label: "XL",
+                value: "1.875rem",
+                subText: "1.875rem",
+              },
+              {
+                label: "XXL",
+                value: "3rem",
+                subText: "3rem",
+              },
+              {
+                label: "3XL",
+                value: "3.75rem",
+                subText: "3.75rem",
+              },
+            ],
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+          {
+            propertyName: "labelStyle",
+            label: "Emphasis",
+            helpText: "Control if the label should be bold or italics",
+            controlType: "BUTTON_TABS",
+            options: [
+              {
+                icon: "BOLD_FONT",
+                value: "BOLD",
+              },
+              {
+                icon: "ITALICS_FONT",
+                value: "ITALIC",
+              },
+            ],
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+        ],
+      },
+      {
+        sectionName: "General",
         children: [
           {
             propertyName: "optionAlignment",
@@ -242,16 +437,34 @@ class CheckboxGroupWidget extends BaseWidget<
         ],
       },
       {
-        sectionName: "Events",
+        sectionName: "Color",
         children: [
           {
-            helpText: "Triggers an action when the check state is changed",
-            propertyName: "onSelectionChange",
-            label: "onSelectionChange",
-            controlType: "ACTION_SELECTOR",
+            propertyName: "accentColor",
+            helpText: "Sets the checked state color of the checkbox",
+            label: "Accent Color",
+            controlType: "COLOR_PICKER",
             isJSConvertible: true,
             isBindProperty: true,
-            isTriggerProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
+          },
+        ],
+      },
+      {
+        sectionName: "Border and Shadow",
+        children: [
+          {
+            propertyName: "borderRadius",
+            label: "Border Radius",
+            helpText:
+              "Rounds the corners of the icon button's outer border edge",
+            controlType: "BORDER_RADIUS_OPTIONS",
+
+            isJSConvertible: true,
+            isBindProperty: true,
+            isTriggerProperty: false,
+            validation: { type: ValidationTypes.TEXT },
           },
         ],
       },
@@ -267,12 +480,21 @@ class CheckboxGroupWidget extends BaseWidget<
   static getMetaPropertiesMap(): Record<string, any> {
     return {
       selectedValues: undefined,
+      isDirty: false,
     };
   }
 
   static getDerivedPropertiesMap(): DerivedPropertiesMap {
     return {
       isValid: `{{ this.isRequired ? !!this.selectedValues.length : true }}`,
+      value: `{{this.selectedValues}}`,
+    };
+  }
+
+  static getStylesheetConfig(): Stylesheet {
+    return {
+      accentColor: "{{appsmith.theme.colors.primaryColor}}",
+      borderRadius: "{{appsmith.theme.borderRadius.appBorderRadius}}",
     };
   }
 
@@ -292,13 +514,24 @@ class CheckboxGroupWidget extends BaseWidget<
         .filter((option) => !options.includes(option))
         .concat(options.filter((option) => !prevOptions.includes(option)));
 
-      let selectedValues = this.props.selectedValues.filter(
+      // TODO(abhinav): Not sure why we have to do this.
+      // Stuff breaks after release merge, fixing it here.
+      let _selectedValues = this.props.selectedValues;
+      if (!Array.isArray(_selectedValues)) {
+        if (
+          this.props.defaultSelectedValues &&
+          this.props.defaultSelectedValues.length &&
+          !Array.isArray(this.props.defaultSelectedValues)
+        ) {
+          _selectedValues = [this.props.defaultSelectedValues];
+        } else {
+          _selectedValues = [];
+        }
+      }
+
+      const selectedValues = _selectedValues.filter(
         (selectedValue: string) => !diffOptions.includes(selectedValue),
       );
-      // if selectedValues empty, and options have changed, set defaultSelectedValues
-      if (!selectedValues.length && this.props.defaultSelectedValues.length) {
-        selectedValues = this.props.defaultSelectedValues;
-      }
 
       this.props.updateWidgetMetaProperty("selectedValues", selectedValues, {
         triggerPropertyName: "onSelectionChange",
@@ -308,23 +541,48 @@ class CheckboxGroupWidget extends BaseWidget<
         },
       });
     }
+    // Reset isDirty to false whenever defaultSelectedValues changes
+    if (
+      xor(this.props.defaultSelectedValues, prevProps.defaultSelectedValues)
+        .length > 0 &&
+      this.props.isDirty
+    ) {
+      this.props.updateWidgetMetaProperty("isDirty", false);
+    }
   }
 
   getPageView() {
     return (
       <CheckboxGroupComponent
+        accentColor={this.props.accentColor}
+        borderRadius={this.props.borderRadius}
+        compactMode={
+          !(
+            (this.props.bottomRow - this.props.topRow) /
+              GRID_DENSITY_MIGRATION_V1 >
+            1
+          )
+        }
         isDisabled={this.props.isDisabled}
+        isDynamicHeightEnabled={isAutoHeightEnabledForWidget(this.props)}
         isInline={this.props.isInline}
         isRequired={this.props.isRequired}
         isSelectAll={this.props.isSelectAll}
         isValid={this.props.isValid}
         key={this.props.widgetId}
+        labelAlignment={this.props.labelAlignment}
+        labelPosition={this.props.labelPosition}
+        labelStyle={this.props.labelStyle}
+        labelText={this.props.labelText}
+        labelTextColor={this.props.labelTextColor}
+        labelTextSize={this.props.labelTextSize}
+        labelTooltip={this.props.labelTooltip}
+        labelWidth={this.getLabelWidth()}
         onChange={this.handleCheckboxChange}
         onSelectAllChange={this.handleSelectAllChange}
         optionAlignment={this.props.optionAlignment}
         options={compact(this.props.options)}
-        rowSpace={this.props.parentRowSpace}
-        selectedValues={this.props.selectedValues}
+        selectedValues={this.props.selectedValues || []}
         widgetId={this.props.widgetId}
       />
     );
@@ -336,7 +594,7 @@ class CheckboxGroupWidget extends BaseWidget<
 
   private handleCheckboxChange = (value: string) => {
     return (event: React.FormEvent<HTMLElement>) => {
-      let { selectedValues } = this.props;
+      let { selectedValues = [] } = this.props;
       const isChecked = (event.target as HTMLInputElement).checked;
       if (isChecked) {
         selectedValues = [...selectedValues, value];
@@ -344,6 +602,11 @@ class CheckboxGroupWidget extends BaseWidget<
         selectedValues = selectedValues.filter(
           (item: string) => item !== value,
         );
+      }
+
+      // Update isDirty to true whenever value changes
+      if (!this.props.isDirty) {
+        this.props.updateWidgetMetaProperty("isDirty", true);
       }
 
       this.props.updateWidgetMetaProperty("selectedValues", selectedValues, {
@@ -358,7 +621,7 @@ class CheckboxGroupWidget extends BaseWidget<
 
   private handleSelectAllChange = (state: SelectAllState) => {
     return () => {
-      let { selectedValues } = this.props;
+      let { selectedValues = [] } = this.props;
 
       switch (state) {
         case SelectAllStates.UNCHECKED:
@@ -368,6 +631,10 @@ class CheckboxGroupWidget extends BaseWidget<
         default:
           selectedValues = [];
           break;
+      }
+
+      if (!this.props.isDirty) {
+        this.props.updateWidgetMetaProperty("isDirty", true);
       }
 
       this.props.updateWidgetMetaProperty("selectedValues", selectedValues, {
@@ -386,10 +653,19 @@ export interface CheckboxGroupWidgetProps extends WidgetProps {
   isInline: boolean;
   isSelectAll?: boolean;
   isRequired?: boolean;
-  isDisabled?: boolean;
+  isDisabled: boolean;
   isValid?: boolean;
   onCheckChanged?: string;
   optionAlignment?: string;
+  labelText?: string;
+  labelPosition?: LabelPosition;
+  labelAlignment?: Alignment;
+  labelWidth?: number;
+  labelTextColor?: string;
+  labelTextSize?: TextSize;
+  labelStyle?: string;
+  accentColor: string;
+  borderRadius: string;
 }
 
 export default CheckboxGroupWidget;

@@ -5,25 +5,27 @@ import DataSourceContextMenu from "./DataSourceContextMenu";
 import { getPluginIcon } from "../ExplorerIcons";
 import { getQueryIdFromURL } from "../helpers";
 import Entity, { EntityClassNames } from "../Entity";
-import { DATA_SOURCES_EDITOR_ID_URL } from "constants/routes";
-import history from "utils/history";
+import history, { NavigationMethod } from "utils/history";
 import {
-  fetchDatasourceStructure,
-  saveDatasourceName,
   expandDatasourceEntity,
-  setDatsourceEditorMode,
+  fetchDatasourceStructure,
+  updateDatasourceName,
 } from "actions/datasourceActions";
 import { useDispatch, useSelector } from "react-redux";
-import { AppState } from "reducers";
+import { AppState } from "@appsmith/reducers";
 import { DatasourceStructureContainer } from "./DatasourceStructureContainer";
 import { isStoredDatasource, PluginType } from "entities/Action";
-import { SAAS_EDITOR_DATASOURCE_ID_URL } from "pages/Editor/SaaSEditor/constants";
-import { getQueryParams } from "utils/AppsmithUtils";
-import {
-  getCurrentApplicationId,
-  getCurrentPageId,
-} from "selectors/editorSelectors";
 import { getAction } from "selectors/entitiesSelector";
+import {
+  datasourcesEditorIdURL,
+  saasEditorDatasourceIdURL,
+} from "RouteBuilder";
+import { inGuidedTour } from "selectors/onboardingSelectors";
+import { getCurrentPageId } from "selectors/editorSelectors";
+import AnalyticsUtil from "utils/AnalyticsUtil";
+import { useLocation } from "react-router";
+import omit from "lodash/omit";
+import { getQueryParams } from "utils/URLUtils";
 
 type ExplorerDatasourceEntityProps = {
   plugin: Plugin;
@@ -32,49 +34,48 @@ type ExplorerDatasourceEntityProps = {
   searchKeyword?: string;
   pageId: string;
   isActive: boolean;
+  canManageDatasource?: boolean;
 };
 
 const ExplorerDatasourceEntity = React.memo(
   (props: ExplorerDatasourceEntityProps) => {
-    const applicationId = useSelector(getCurrentApplicationId);
-    const pageId = useSelector(getCurrentPageId) as string;
+    const guidedTourEnabled = useSelector(inGuidedTour);
     const dispatch = useDispatch();
+    const pageId = useSelector(getCurrentPageId);
     const icon = getPluginIcon(props.plugin);
+    const location = useLocation();
     const switchDatasource = useCallback(() => {
+      let url;
       if (props.plugin && props.plugin.type === PluginType.SAAS) {
-        history.push(
-          SAAS_EDITOR_DATASOURCE_ID_URL(
-            applicationId,
-            pageId,
-            props.plugin.packageName,
-            props.datasource.id,
-            {
-              viewMode: true,
-            },
-          ),
-        );
+        url = saasEditorDatasourceIdURL({
+          pageId,
+          pluginPackageName: props.plugin.packageName,
+          datasourceId: props.datasource.id,
+        });
       } else {
-        dispatch(
-          setDatsourceEditorMode({ id: props.datasource.id, viewMode: true }),
-        );
-        history.push(
-          DATA_SOURCES_EDITOR_ID_URL(
-            applicationId,
-            pageId,
-            props.datasource.id,
-            getQueryParams(),
-          ),
-        );
+        url = datasourcesEditorIdURL({
+          pageId,
+          datasourceId: props.datasource.id,
+          params: omit(getQueryParams(), "viewMode"),
+        });
       }
-    }, [applicationId, pageId, props.datasource.id]);
+
+      AnalyticsUtil.logEvent("ENTITY_EXPLORER_CLICK", {
+        type: "DATASOURCES",
+        fromUrl: location.pathname,
+        toUrl: url,
+        name: props.datasource.name,
+      });
+      history.push(url, { invokedBy: NavigationMethod.EntityExplorer });
+    }, [props.datasource.id, props.datasource.name, location.pathname]);
 
     const queryId = getQueryIdFromURL();
     const queryAction = useSelector((state: AppState) =>
       getAction(state, queryId || ""),
     );
 
-    const updateDatasourceName = (id: string, name: string) =>
-      saveDatasourceName({ id: props.datasource.id, name });
+    const updateDatasourceNameCall = (id: string, name: string) =>
+      updateDatasourceName({ id: props.datasource.id, name });
 
     const datasourceStructure = useSelector((state: AppState) => {
       return state.entities.datasources.structure[props.datasource.id];
@@ -85,9 +86,9 @@ const ExplorerDatasourceEntity = React.memo(
     });
 
     const getDatasourceStructure = useCallback(
-      (isOpen) => {
+      (isOpen: boolean) => {
         if (!datasourceStructure && isOpen) {
-          dispatch(fetchDatasourceStructure(props.datasource.id));
+          dispatch(fetchDatasourceStructure(props.datasource.id, true));
         }
 
         dispatch(expandDatasourceEntity(isOpen ? props.datasource.id : ""));
@@ -106,20 +107,25 @@ const ExplorerDatasourceEntity = React.memo(
     } else if (queryAction && isStoredDatasource(queryAction.datasource)) {
       isDefaultExpanded = queryAction.datasource.id === props.datasource.id;
     }
+    // In guided tour we want the datasource structure to be shown only when expanded
+    if (guidedTourEnabled) {
+      isDefaultExpanded = false;
+    }
 
     return (
       <Entity
         action={switchDatasource}
         active={props.isActive}
+        canEditEntityName={props.canManageDatasource}
         className="datasource"
         contextMenu={
           <DataSourceContextMenu
             className={EntityClassNames.CONTEXT_MENU}
             datasourceId={props.datasource.id}
-            entityId={`${props.datasource.id}-${props.pageId}`}
+            entityId={`${props.datasource.id}`}
           />
         }
-        entityId={`${props.datasource.id}-${props.pageId}`}
+        entityId={`${props.datasource.id}`}
         icon={icon}
         isDefaultExpanded={isDefaultExpanded}
         key={props.datasource.id}
@@ -128,7 +134,7 @@ const ExplorerDatasourceEntity = React.memo(
         onToggle={getDatasourceStructure}
         searchKeyword={props.searchKeyword}
         step={props.step}
-        updateEntityName={updateDatasourceName}
+        updateEntityName={updateDatasourceNameCall}
       >
         <DatasourceStructureContainer
           datasourceId={props.datasource.id}

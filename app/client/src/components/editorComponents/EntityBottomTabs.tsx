@@ -1,49 +1,73 @@
-import React, { useState, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { setCurrentTab } from "actions/debuggerActions";
-import { TabComponent, TabProp } from "components/ads/Tabs";
-import { getCurrentDebuggerTab } from "selectors/debuggerSelectors";
+import React, { RefObject, useMemo } from "react";
+import {
+  CollapsibleTabProps,
+  collapsibleTabRequiredPropKeys,
+  TabComponent,
+  TabProp,
+} from "design-system";
 import AnalyticsUtil from "utils/AnalyticsUtil";
 import { DEBUGGER_TAB_KEYS } from "./Debugger/helpers";
 
 type EntityBottomTabsProps = {
-  defaultIndex: number;
   tabs: TabProp[];
+  responseViewer?: boolean;
+  onSelect?: (tab: TabProp["key"]) => void;
+  selectedTabKey: string;
+  canCollapse?: boolean;
+  // Reference to container for collapsing or expanding content
+  containerRef?: RefObject<HTMLElement>;
+  // height of container when expanded
+  expandedHeight?: string;
 };
-// Using this if there are debugger related tabs
-function EntityBottomTabs(props: EntityBottomTabsProps) {
-  const [selectedIndex, setSelectedIndex] = useState(props.defaultIndex);
-  const currentTab = useSelector(getCurrentDebuggerTab);
-  const dispatch = useDispatch();
-  const onTabSelect = (index: number) => {
-    dispatch(setCurrentTab(props.tabs[index].key));
-    setIndex(index);
-  };
 
-  const setIndex = (index: number) => {
-    const tabKey = props.tabs[index].key;
-    setSelectedIndex(index);
-    if (Object.values<string>(DEBUGGER_TAB_KEYS).includes(tabKey)) {
+type CollapsibleEntityBottomTabsProps = EntityBottomTabsProps &
+  CollapsibleTabProps;
+
+// Tab is considered collapsible only when all required collapsible props are present
+export const isCollapsibleEntityBottomTab = (
+  props: EntityBottomTabsProps | CollapsibleEntityBottomTabsProps,
+): props is CollapsibleEntityBottomTabsProps =>
+  collapsibleTabRequiredPropKeys.every((key) => key in props);
+
+// Using this if there are debugger related tabs
+function EntityBottomTabs(
+  props: EntityBottomTabsProps | CollapsibleEntityBottomTabsProps,
+) {
+  const onTabSelect = (index: number) => {
+    const tab = props.tabs[index];
+    props.onSelect && props.onSelect(tab.key);
+
+    if (Object.values<string>(DEBUGGER_TAB_KEYS).includes(tab.key)) {
       AnalyticsUtil.logEvent("DEBUGGER_TAB_SWITCH", {
-        tabName: tabKey,
+        tabName: tab.key,
       });
     }
   };
 
-  useEffect(() => {
-    const index = props.tabs.findIndex((tab) => tab.key === currentTab);
+  const getIndex = useMemo(() => {
+    const index = props.tabs.findIndex(
+      (tab) => tab.key === props.selectedTabKey,
+    );
+
     if (index >= 0) {
-      setIndex(index);
-    } else {
-      setIndex(props.defaultIndex);
+      return index;
     }
-  }, [currentTab]);
+
+    return 0;
+  }, [props.selectedTabKey]);
 
   return (
     <TabComponent
       onSelect={onTabSelect}
-      selectedIndex={selectedIndex}
+      responseViewer={props.responseViewer}
+      selectedIndex={getIndex}
       tabs={props.tabs}
+      {...(isCollapsibleEntityBottomTab(props)
+        ? {
+            containerRef: props.containerRef,
+            expandedHeight: props.expandedHeight,
+          }
+        : {})}
     />
   );
 }

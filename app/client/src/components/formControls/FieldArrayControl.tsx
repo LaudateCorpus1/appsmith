@@ -1,8 +1,6 @@
 import React, { useEffect } from "react";
 import FormControl from "pages/Editor/FormControl";
-import Text, { TextType } from "components/ads/Text";
-import Icon, { IconSize } from "components/ads/Icon";
-import { Classes } from "components/ads/common";
+import { Classes, Icon, IconSize, Text, TextType } from "design-system";
 import styled from "styled-components";
 import { FieldArray } from "redux-form";
 import { ControlProps } from "./BaseControl";
@@ -57,11 +55,10 @@ const AddMoreAction = styled.div`
     color: #03b365;
   }
 `;
-
 function NestedComponents(props: any) {
   useEffect(() => {
     if (props.fields.length < 1) {
-      props.fields.push({});
+      props.fields.push({ path: "", value: "" });
     }
   }, [props.fields.length]);
   return (
@@ -75,6 +72,10 @@ function NestedComponents(props: any) {
                 sch = {
                   ...sch,
                   configProperty: `${field}.${sch.key}`,
+                  customStyles: {
+                    width: "20vw",
+                    ...props.customStyles,
+                  },
                 };
                 return (
                   <FormControl
@@ -86,7 +87,7 @@ function NestedComponents(props: any) {
               })}
               <CenteredIcon
                 name="delete"
-                onClick={(e) => {
+                onClick={(e: React.MouseEvent) => {
                   e.stopPropagation();
                   props.fields.remove(index);
                 }}
@@ -95,7 +96,7 @@ function NestedComponents(props: any) {
             </SecondaryBox>
           );
         })}
-      <AddMoreAction onClick={() => props.fields.push({})}>
+      <AddMoreAction onClick={() => props.fields.push({ path: "", value: "" })}>
         {/*Hardcoded label to be removed */}
         <Text type={TextType.H5}>+ Add Condition (And)</Text>
       </AddMoreAction>

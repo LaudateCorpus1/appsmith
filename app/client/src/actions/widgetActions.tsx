@@ -2,13 +2,14 @@ import {
   ReduxActionTypes,
   ReduxAction,
   WidgetReduxActionTypes,
-} from "constants/ReduxActionConstants";
+} from "@appsmith/constants/ReduxActionConstants";
 import { ExecuteTriggerPayload } from "constants/AppsmithActionConstants/ActionConstants";
 import { BatchAction, batchAction } from "actions/batchActions";
 import PerformanceTracker, {
   PerformanceTransactionName,
 } from "utils/PerformanceTracker";
 import { WidgetProps } from "widgets/BaseWidget";
+import { UpdateWidgetsPayload } from "reducers/entityReducers/canvasWidgetsReducer";
 
 export const executeTrigger = (
   payload: ExecuteTriggerPayload,
@@ -47,11 +48,12 @@ export const focusWidget = (
   payload: { widgetId },
 });
 
-export const showModal = (id: string) => {
+export const showModal = (id: string, shouldSelectModal = true) => {
   return {
     type: ReduxActionTypes.SHOW_MODAL,
     payload: {
       modalId: id,
+      shouldSelectModal,
     },
   };
 };
@@ -103,11 +105,15 @@ export const copyWidget = (isShortcut: boolean) => {
   };
 };
 
-export const pasteWidget = (groupWidgets = false) => {
+export const pasteWidget = (
+  groupWidgets = false,
+  mouseLocation: { x: number; y: number },
+) => {
   return {
     type: ReduxActionTypes.PASTE_COPIED_WIDGET_INIT,
     payload: {
       groupWidgets: groupWidgets,
+      mouseLocation,
     },
   };
 };
@@ -147,5 +153,14 @@ export const addSuggestedWidget = (payload: Partial<WidgetProps>) => {
 export const groupWidgets = () => {
   return {
     type: ReduxActionTypes.GROUP_WIDGETS_INIT,
+  };
+};
+
+export const updateMultipleWidgetProperties = (
+  widgetsToUpdate: UpdateWidgetsPayload,
+) => {
+  return {
+    type: ReduxActionTypes.UPDATE_MULTIPLE_WIDGET_PROPERTIES,
+    payload: widgetsToUpdate,
   };
 };

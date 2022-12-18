@@ -1,4 +1,4 @@
-const homePage = require("../../../locators/HomePage.json");
+import homePage from "../../../locators/HomePage";
 const dsl = require("../../../fixtures/PgAdmindsl.json");
 const datasource = require("../../../locators/DatasourcesEditor.json");
 const queryLocators = require("../../../locators/QueryEditor.json");
@@ -6,14 +6,12 @@ const widgetsPage = require("../../../locators/Widgets.json");
 const appPage = require("../../../locators/PgAdminlocators.json");
 
 describe("PgAdmin Clone App", function() {
-  let orgid;
-  let newOrganizationName;
-  let appname;
   let datasourceName;
 
   before(() => {
     cy.addDsl(dsl);
   });
+
   beforeEach(() => {
     cy.startRoutesForDatasource();
   });
@@ -22,14 +20,11 @@ describe("PgAdmin Clone App", function() {
     // authenticating datasource
     cy.NavigateToDatasourceEditor();
     cy.get(datasource.PostgreSQL).click();
-
-    cy.getPluginFormsAndCreateDatasource();
-
     cy.fillPostgresDatasourceForm();
 
     cy.testSaveDatasource();
 
-    cy.get("@createDatasource").then((httpResponse) => {
+    cy.get("@saveDatasource").then((httpResponse) => {
       datasourceName = httpResponse.response.body.data.name;
     });
   });

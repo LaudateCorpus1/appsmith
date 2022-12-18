@@ -4,7 +4,7 @@ import { Button, ButtonGroup, IButtonProps } from "@blueprintjs/core";
 
 import BaseControl, { ControlProps } from "./BaseControl";
 import { ControlIcons } from "icons/ControlIcons";
-import { ThemeProp } from "components/ads/common";
+import { ThemeProp } from "widgets/constants";
 
 export enum ButtonBorderRadiusTypes {
   SHARP = "SHARP",
@@ -24,6 +24,7 @@ const StyledButton = styled(Button)<ThemeProp & IButtonProps>`
   box-shadow: none !important;
   background-image: none !important;
   background-color: #ffffff !important;
+  min-height: 100% !important;
   & > div {
     display: flex;
   }
