@@ -487,14 +487,14 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Download the react build artifact
         if: steps.run_result.outputs.run_result != 'success'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: client-build
           path: app/client/build
 
       - name: Download the server build artifact
         if: steps.run_result.outputs.run_result != 'success'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: server-build
           path: app/server/dist
@@ -726,19 +726,19 @@ jobs:
           java-version: "11.0.10"
 
       - name: Download the react build artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: client-build
           path: app/client/build
 
       - name: Download the server build artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: server-build
           path: app/server/dist
 
       - name: Download the rts build artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: rts-dist
           path: app/rts/dist
@@ -1147,7 +1147,7 @@ jobs:
 
       - name: Download the server build artifact
         if: steps.run_result.outputs.run_result != 'success'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: server-build
           path: app/server/dist
@@ -1247,7 +1247,7 @@ jobs:
 
       - name: Download the react build artifact
         if: steps.run_result.outputs.run_result != 'success'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: client-build
           path: app/client/build
@@ -1477,7 +1477,7 @@ jobs:
       - run: echo "All ui-test matrices completed"
 
       # Download failed_spec list for all jobs
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         if: needs.ui-test.result
         id: download
         with:
@@ -1485,7 +1485,7 @@ jobs:
           path: ~/failed_spec
 
       # Download failed_spec_fat list for all fat container jobs
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         if: needs.fat-container-test.result
         id: download_fat
         with:
@@ -1591,19 +1591,19 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Download the react build artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: client-build
           path: app/client/build
 
       - name: Download the server build artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: server-build
           path: app/server/dist
 
       - name: Download the rts build artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: rts-dist
           path: app/rts/dist

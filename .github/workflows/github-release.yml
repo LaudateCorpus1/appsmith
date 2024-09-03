@@ -201,19 +201,19 @@ jobs:
         uses: depot/setup-action@v1
 
       - name: Download the client build artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: client-build
           path: app/client/build
 
       - name: Download the server build artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: server-build
           path: app/server/dist
 
       - name: Download the rts build artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: rts-dist
           path: app/rts/dist
